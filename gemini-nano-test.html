@@ -1,0 +1,481 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gemini Nano Prompt API 테스트</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        
+        .container {
+            background: white;
+            border-radius: 12px;
+            padding: 30px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        
+        .status-section {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 30px;
+            border-left: 4px solid #007bff;
+        }
+        
+        .status-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        
+        .status-badge {
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+        
+        .status-available {
+            background: #d4edda;
+            color: #155724;
+        }
+        
+        .status-unavailable {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        
+        .status-checking {
+            background: #fff3cd;
+            color: #856404;
+        }
+        
+        .input-section {
+            margin-bottom: 30px;
+        }
+        
+        .input-group {
+            margin-bottom: 20px;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #333;
+        }
+        
+        textarea {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 14px;
+            resize: vertical;
+            min-height: 100px;
+            box-sizing: border-box;
+        }
+        
+        textarea:focus {
+            outline: none;
+            border-color: #007bff;
+        }
+        
+        .button-group {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        
+        button {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .btn-primary {
+            background: #007bff;
+            color: white;
+        }
+        
+        .btn-primary:hover:not(:disabled) {
+            background: #0056b3;
+        }
+        
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+        }
+        
+        .btn-secondary:hover:not(:disabled) {
+            background: #545b62;
+        }
+        
+        button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+        
+        .output-section {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 20px;
+            min-height: 150px;
+        }
+        
+        .output-content {
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            line-height: 1.5;
+            color: #333;
+        }
+        
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #007bff;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .error {
+            color: #dc3545;
+            background: #f8d7da;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 10px 0;
+        }
+        
+        .warning {
+            color: #856404;
+            background: #fff3cd;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 10px 0;
+        }
+        
+        .requirements {
+            background: #e9ecef;
+            border-radius: 8px;
+            padding: 15px;
+            margin-top: 20px;
+            font-size: 12px;
+        }
+        
+        .requirements h4 {
+            margin-top: 0;
+            color: #495057;
+        }
+        
+        .requirements ul {
+            margin-bottom: 0;
+            padding-left: 20px;
+        }
+        
+        /* 세션 초기화 버튼 숨기기 - 자동 초기화로 변경 */
+        #initBtn {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🤖 Gemini Nano Prompt API 테스트</h1>
+        
+        <!-- API 상태 확인 섹션 -->
+        <div class="status-section">
+            <h3>API 상태</h3>
+            <div class="status-item">
+                <span>브라우저 지원:</span>
+                <span id="browserStatus" class="status-badge status-checking">확인 중...</span>
+            </div>
+            <div class="status-item">
+                <span>API 가용성:</span>
+                <span id="apiStatus" class="status-badge status-checking">확인 중...</span>
+            </div>
+            <div class="status-item">
+                <span>세션 상태:</span>
+                <span id="sessionStatus" class="status-badge status-unavailable">비활성</span>
+            </div>
+        </div>
+        
+        <!-- 프롬프트 입력 섹션 -->
+        <div class="input-section">
+            <div class="input-group">
+                <label for="promptInput">프롬프트 입력:</label>
+                <textarea 
+                    id="promptInput" 
+                    placeholder="여기에 질문이나 요청을 입력하세요. 예: '간단한 시를 써주세요' 또는 'JavaScript의 장점을 설명해주세요'"
+                >안녕하세요! 간단한 자기소개를 해주세요.</textarea>
+            </div>
+            
+            <div class="button-group">
+                <button id="initBtn" class="btn-secondary">세션 초기화</button>
+                <button id="sendBtn" class="btn-primary" disabled>프롬프트 전송</button>
+                <button id="clearBtn" class="btn-secondary">결과 지우기</button>
+            </div>
+        </div>
+        
+        <!-- 결과 출력 섹션 -->
+        <div class="output-section">
+            <h3>응답 결과:</h3>
+            <div id="output" class="output-content">
+                API 상태를 확인하고 세션을 초기화한 후 프롬프트를 전송해보세요.
+            </div>
+        </div>
+        
+        <!-- 시스템 요구사항 안내 -->
+        <div class="requirements">
+            <h4>📋 시스템 요구사항 및 설정</h4>
+            <div class="error" style="margin-bottom: 15px;">
+                <strong>🚨 window.ai 오류 해결 방법:</strong>
+                <ol style="margin: 10px 0; padding-left: 20px;">
+                    <li><strong>Chrome 버전:</strong> <a href="chrome://version/" target="_blank">chrome://version/</a>에서 127+ 확인</li>
+                    <li><strong>필수 플래그 활성화:</strong>
+                        <ul style="margin: 5px 0;">
+                            <li><a href="chrome://flags/#prompt-api-for-gemini-nano" target="_blank">chrome://flags/#prompt-api-for-gemini-nano</a> → "Enabled"</li>
+                            <li><a href="chrome://flags/#optimization-guide-on-device-model" target="_blank">chrome://flags/#optimization-guide-on-device-model</a> → "Enabled"</li>
+                        </ul>
+                    </li>
+                    <li><strong>Chrome 재시작</strong> 후 다시 테스트</li>
+                    <li><strong>Chrome Canary</strong> 사용 권장 (최신 기능 지원)</li>
+                </ol>
+            </div>
+            <ul>
+                <li>Chrome 127+ 브라우저 (Chrome Canary 권장)</li>
+                <li>Windows 10/11 또는 macOS 13+ (Ventura)</li>
+                <li>22GB+ 저장공간 및 4GB+ VRAM</li>
+                <li>위의 플래그 설정 필수</li>
+            </ul>
+        </div>
+    </div>
+
+    <script>
+        // 전역 변수
+        let session = null;
+        let isProcessing = false;
+        
+        // DOM 요소 참조
+        const elements = {
+            browserStatus: document.getElementById('browserStatus'),
+            apiStatus: document.getElementById('apiStatus'),
+            sessionStatus: document.getElementById('sessionStatus'),
+            promptInput: document.getElementById('promptInput'),
+            initBtn: document.getElementById('initBtn'),
+            sendBtn: document.getElementById('sendBtn'),
+            clearBtn: document.getElementById('clearBtn'),
+            output: document.getElementById('output')
+        };
+        
+        // 상태 업데이트 함수
+        function updateStatus(element, status, text) {
+            element.className = `status-badge status-${status}`;
+            element.textContent = text;
+        }
+        
+        // 로그 출력 함수
+        function log(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            const logMessage = `[${timestamp}] ${message}`;
+            
+            if (type === 'error') {
+                elements.output.innerHTML = `<div class="error">${logMessage}</div>`;
+            } else if (type === 'warning') {
+                elements.output.innerHTML = `<div class="warning">${logMessage}</div>`;
+            } else {
+                elements.output.textContent = logMessage;
+            }
+            console.log(logMessage);
+        }
+        
+        // 브라우저 지원 확인
+        function checkBrowserSupport() {
+            log('브라우저 지원 확인 중...');
+            
+            if (typeof LanguageModel === 'undefined') {
+                updateStatus(elements.browserStatus, 'unavailable', '미지원');
+                log('LanguageModel이 정의되지 않았습니다. Chrome 127+ 및 적절한 플래그 설정이 필요합니다.', 'error');
+                return false;
+            }
+            
+            if (typeof LanguageModel.availability !== 'function') {
+                updateStatus(elements.browserStatus, 'unavailable', '미지원');
+                log('LanguageModel.availability 메서드를 찾을 수 없습니다.', 'error');
+                return false;
+            }
+
+            updateStatus(elements.browserStatus, 'available', '지원됨');
+            log('브라우저가 Prompt API를 지원합니다.');
+            return true;
+        }
+        
+        // API 가용성 확인
+        async function checkApiAvailability() {
+            try {
+                log('API 가용성 확인 중...');
+                updateStatus(elements.apiStatus, 'checking', '확인 중...');
+                
+                const availability = await LanguageModel.availability();
+                log(`API 상태: ${availability}`);
+                
+                if (availability === 'available') {
+                    updateStatus(elements.apiStatus, 'available', '사용 가능');
+                    log('Gemini Nano API를 바로 사용할 수 있습니다.');
+                    elements.initBtn.disabled = false;
+                    return true;
+                } else if (availability === 'downloadable') {
+                    updateStatus(elements.apiStatus, 'unavailable', '다운로드 필요');
+                    log('모델 다운로드가 필요합니다. 세션 생성 시 자동 다운로드됩니다.', 'warning');
+                    elements.initBtn.disabled = false;
+                    return true;
+                } else if (availability === 'downloading') {
+                    updateStatus(elements.apiStatus, 'checking', '다운로드 중');
+                    log('모델 다운로드가 진행 중입니다. 잠시 후 다시 시도해주세요.', 'warning');
+                    return false;
+                } else {
+                    updateStatus(elements.apiStatus, 'unavailable', '사용 불가');
+                    log(`API를 사용할 수 없습니다: ${availability}`, 'error');
+                    return false;
+                }
+            } catch (error) {
+                updateStatus(elements.apiStatus, 'unavailable', '오류');
+                log(`API 가용성 확인 중 오류: ${error.message}`, 'error');
+                return false;
+            }
+        }
+        
+        // 세션 초기화
+        async function initializeSession() {
+            try {
+                log('세션 초기화 중...');
+                elements.initBtn.disabled = true;
+                updateStatus(elements.sessionStatus, 'checking', '초기화 중...');
+                
+                // 기존 세션 정리
+                if (session) {
+                    try {
+                        await session.destroy();
+                    } catch (e) {
+                        console.warn('기존 세션 정리 중 오류:', e);
+                    }
+                }
+                
+                // 새 세션 생성
+                session = await LanguageModel.create();
+                
+                if (session) {
+                    updateStatus(elements.sessionStatus, 'available', '활성');
+                    elements.sendBtn.disabled = false;
+                    log('세션이 성공적으로 초기화되었습니다.');
+                } else {
+                    throw new Error('세션 생성 실패');
+                }
+            } catch (error) {
+                updateStatus(elements.sessionStatus, 'unavailable', '오류');
+                log(`세션 초기화 실패: ${error.message}`, 'error');
+            } finally {
+                elements.initBtn.disabled = false;
+            }
+        }
+        
+        // 프롬프트 전송
+        async function sendPrompt() {
+            if (!session || isProcessing) {
+                return;
+            }
+            
+            const prompt = elements.promptInput.value.trim();
+            if (!prompt) {
+                log('프롬프트를 입력해주세요.', 'warning');
+                return;
+            }
+            
+            try {
+                isProcessing = true;
+                elements.sendBtn.disabled = true;
+                elements.sendBtn.innerHTML = '<span class="loading"></span> 처리 중...';
+                
+                log(`프롬프트 전송: "${prompt}"`);
+                elements.output.innerHTML = '<div class="loading"></div> AI가 응답을 생성하고 있습니다...';
+                
+                const result = await session.prompt(prompt);
+                
+                log('응답 받음:');
+                elements.output.textContent = result;
+                
+            } catch (error) {
+                log(`프롬프트 처리 중 오류: ${error.message}`, 'error');
+            } finally {
+                isProcessing = false;
+                elements.sendBtn.disabled = false;
+                elements.sendBtn.textContent = '프롬프트 전송';
+            }
+        }
+        
+        // 결과 지우기
+        function clearOutput() {
+            elements.output.textContent = '결과가 지워졌습니다.';
+            log('출력 결과를 지웠습니다.');
+        }
+        
+        // 이벤트 리스너 등록
+        elements.initBtn.addEventListener('click', initializeSession);
+        elements.sendBtn.addEventListener('click', sendPrompt);
+        elements.clearBtn.addEventListener('click', clearOutput);
+        
+        // Enter 키로 전송 (Ctrl+Enter)
+        elements.promptInput.addEventListener('keydown', (e) => {
+            if (e.ctrlKey && e.key === 'Enter') {
+                e.preventDefault();
+                sendPrompt();
+            }
+        });
+        
+        // 페이지 로드 시 초기화
+        document.addEventListener('DOMContentLoaded', async () => {
+            log('Gemini Nano Prompt API 테스트 앱을 시작합니다.');
+            
+            // 브라우저 지원 확인
+            if (checkBrowserSupport()) {
+                // API 가용성 확인
+                const apiAvailable = await checkApiAvailability();
+                // API가 사용 가능하면 자동으로 세션 초기화
+                if (apiAvailable) {
+                    await initializeSession();
+                }
+            }
+        });
+        
+        // 페이지 언로드 시 세션 정리
+        window.addEventListener('beforeunload', () => {
+            if (session) {
+                session.destroy().catch(console.warn);
+            }
+        });
+    </script>
+</body>
+</html>
