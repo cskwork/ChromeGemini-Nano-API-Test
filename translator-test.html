@@ -318,10 +318,7 @@
             padding-left: 20px;
         }
         
-        /* 번역기 생성 버튼 숨기기 - 자동 생성으로 변경 */
-        #createTranslatorBtn {
-            display: none;
-        }
+        /* 번역기 생성 버튼 제거됨 */
         
         @media (max-width: 768px) {
             .language-section {
@@ -368,8 +365,8 @@
                 <span id="poolStatus" class="status-badge status-checking">준비 중...</span>
             </div>
             <div class="status-item">
-                <span>자동 생성 진행:</span>
-                <span id="autoCreationStatus" class="status-badge status-checking">0/8</span>
+                <span>백그라운드 확인:</span>
+                <span id="autoCreationStatus" class="status-badge status-checking">준비 중...</span>
             </div>
         </div>
         
@@ -459,7 +456,6 @@
         
         <!-- 버튼 그룹 -->
         <div class="button-group">
-            <button id="createTranslatorBtn" class="btn-secondary">번역기 생성</button>
             <button id="translateBtn" class="btn-primary" disabled>번역하기</button>
             <button id="clearBtn" class="btn-secondary">텍스트 지우기</button>
         </div>
@@ -476,6 +472,9 @@
             </ul>
             <div class="warning" style="margin-top: 15px;">
                 <strong>⚠️ 실험적 API:</strong> Chrome 138+에서 사용 가능하며, chrome://flags에서 관련 설정이 필요할 수 있습니다.
+            </div>
+            <div class="warning" style="margin-top: 10px;">
+                <strong>🔒 모델 다운로드:</strong> 새로운 언어 모델이 필요한 경우, 언어 선택 시 자동으로 다운로드됩니다.
             </div>
         </div>
     </div>
@@ -515,7 +514,6 @@
             outputText: document.getElementById('outputText'),
             inputCount: document.getElementById('inputCount'),
             outputCount: document.getElementById('outputCount'),
-            createTranslatorBtn: document.getElementById('createTranslatorBtn'),
             translateBtn: document.getElementById('translateBtn'),
             clearBtn: document.getElementById('clearBtn')
         };
@@ -564,6 +562,26 @@
             }, 5000);
         }
         
+        // 번역기 가용성 확인
+        async function checkTranslatorAvailability(sourceLanguage, targetLanguage) {
+            try {
+                // Translator.availability 메서드가 있는지 확인
+                if (typeof Translator.availability === 'function') {
+                    const availability = await Translator.availability({
+                        sourceLanguage: sourceLanguage,
+                        targetLanguage: targetLanguage
+                    });
+                    return availability;
+                } else {
+                    // availability 메서드가 없으면 기본값 반환
+                    return 'available';
+                }
+            } catch (error) {
+                console.warn('가용성 확인 실패:', error);
+                return 'unknown';
+            }
+        }
+
         // 브라우저 지원 확인
         function checkBrowserSupport() {
             log('브라우저 지원 확인 중...');
@@ -579,7 +597,6 @@
             updateStatus(elements.apiStatus, 'available', '사용 가능');
 
             log('브라우저가 Translator API를 지원합니다.');
-            elements.createTranslatorBtn.disabled = false;
             return true;
         }
         
@@ -622,55 +639,7 @@
             }
         }
         
-        // 번역기 풀 자동 생성 (백그라운드)
-        async function autoCreateTranslators() {
-            if (autoCreationInProgress) return;
-            
-            autoCreationInProgress = true;
-            updateStatus(elements.poolStatus, 'checking', '생성 중...');
-            
-            log('번역기 풀 자동 생성을 시작합니다...');
-            
-            // 우선순위별로 정렬
-            const sortedPairs = [...priorityLanguagePairs].sort((a, b) => a.priority - b.priority);
-            let createdCount = 0;
-            
-            for (let i = 0; i < sortedPairs.length; i++) {
-                const pair = sortedPairs[i];
-                const key = getTranslatorKey(pair.source, pair.target);
-                
-                // 이미 존재하는 번역기는 건너뛰기
-                if (translatorPool.has(key)) {
-                    createdCount++;
-                    updateStatus(elements.autoCreationStatus, 'available', `${createdCount}/${sortedPairs.length}`);
-                    continue;
-                }
-                
-                try {
-                    updateStatus(elements.autoCreationStatus, 'checking', `${createdCount}/${sortedPairs.length} (생성: ${pair.name})`);
-                    
-                    await createSingleTranslator(pair.source, pair.target, true);
-                    createdCount++;
-                    
-                    updateStatus(elements.autoCreationStatus, 'checking', `${createdCount}/${sortedPairs.length}`);
-                    
-                    // CPU 부하 방지를 위한 짧은 지연
-                    await new Promise(resolve => setTimeout(resolve, 100));
-                    
-                } catch (error) {
-                    console.warn(`자동 생성 실패 (${pair.name}):`, error);
-                }
-            }
-            
-            autoCreationInProgress = false;
-            updateStatus(elements.poolStatus, 'available', `${translatorPool.size}개 준비됨`);
-            updateStatus(elements.autoCreationStatus, 'available', `완료 (${createdCount}/${sortedPairs.length})`);
-            
-            log(`번역기 풀 자동 생성 완료: ${translatorPool.size}개의 번역기가 준비되었습니다.`);
-            
-            // 현재 언어 설정에 맞는 번역기가 있다면 자동 활성화
-            setActiveTranslator();
-        }
+        // 백그라운드 생성 함수 제거됨 - initializeAllTranslators에서 처리
         
         // 활성 번역기 설정 (풀에서 선택)
         function setActiveTranslator() {
@@ -699,53 +668,9 @@
             return false;
         }
         
-        // 기존 번역기 생성 함수 (수동 생성용)
-        async function createTranslator() {
-            try {
-                const sourceLanguage = elements.sourceLanguage.value;
-                const targetLanguage = elements.targetLanguage.value;
-                
-                if (sourceLanguage === targetLanguage) {
-                    throw new Error('출발어와 도착어가 같습니다. 다른 언어를 선택해주세요.');
-                }
-                
-                // 먼저 풀에서 확인
-                if (setActiveTranslator()) {
-                    showNotification('풀에서 기존 번역기를 활성화했습니다!');
-                    return;
-                }
-                
-                // 풀에 없으면 새로 생성
-                log('풀에 해당 번역기가 없어 새로 생성합니다...');
-                elements.createTranslatorBtn.disabled = true;
-                elements.createTranslatorBtn.innerHTML = '<span class="loading"></span>번역기 생성 중...';
-                updateStatus(elements.translatorStatus, 'checking', '생성 중...');
-                
-                const newTranslator = await createSingleTranslator(sourceLanguage, targetLanguage, false);
-                
-                if (newTranslator) {
-                    translator = newTranslator;
-                    currentSourceLang = sourceLanguage;
-                    currentTargetLang = targetLanguage;
-                    updateStatus(elements.translatorStatus, 'available', `${sourceLanguage} → ${targetLanguage}`);
-                    elements.translateBtn.disabled = false;
-                    showNotification('번역기가 성공적으로 생성되었습니다!');
-                    
-                    // 풀 상태 업데이트
-                    updateStatus(elements.poolStatus, 'available', `${translatorPool.size}개 준비됨`);
-                } else {
-                    throw new Error('번역기 생성 실패');
-                }
-            } catch (error) {
-                updateStatus(elements.translatorStatus, 'unavailable', '오류');
-                log(`번역기 생성 실패: ${error.message}`, 'error');
-            } finally {
-                elements.createTranslatorBtn.disabled = false;
-                elements.createTranslatorBtn.textContent = '번역기 생성';
-            }
-        }
+        // 번역기 생성 함수 제거 - 자동 생성으로 대체됨
         
-        // 언어 변경 확인
+        // 언어 변경 시 자동 번역기 생성 (사용자 제스처)
         async function checkLanguageChange() {
             const newSource = elements.sourceLanguage.value;
             const newTarget = elements.targetLanguage.value;
@@ -758,18 +683,34 @@
                 return;
             }
             
-            // 풀에서 해당 번역기가 있는지 먼저 확인
+            // 풀에서 해당 번역기가 있는지 확인하고 전환
             if (setActiveTranslator()) {
+                log(`번역기 전환: ${newSource} → ${newTarget}`);
                 return; // 풀에서 성공적으로 활성화됨
             }
             
-            // 풀에 없으면 즉시 생성
-            log(`필요한 번역기(${newSource} → ${newTarget})를 생성합니다...`);
+            // 풀에 없으면 즉시 자동 생성 (언어 변경은 사용자 제스처)
+            log(`번역기(${newSource} → ${newTarget})를 자동 생성합니다...`);
             updateStatus(elements.translatorStatus, 'checking', '생성 중...');
             elements.translateBtn.disabled = true;
             
             try {
+                const availability = await checkTranslatorAvailability(newSource, newTarget);
+                log(`가용성 상태: ${availability}`);
+                
+                if (availability === 'unavailable') {
+                    throw new Error('이 언어 쌍은 현재 지원되지 않습니다.');
+                }
+                
+                if (availability === 'downloadable') {
+                    showNotification(`모델 다운로드가 시작됩니다... (${newSource} → ${newTarget})`, 'warning');
+                } else if (availability === 'downloading') {
+                    showNotification(`모델 다운로드 중입니다... (${newSource} → ${newTarget})`, 'warning');
+                }
+                
+                // 언어 변경은 사용자 제스처이므로 어떤 상태든 생성 시도
                 const newTranslator = await createSingleTranslator(newSource, newTarget, false);
+                
                 if (newTranslator) {
                     translator = newTranslator;
                     currentSourceLang = newSource;
@@ -783,10 +724,20 @@
                 } else {
                     throw new Error('번역기 생성 실패');
                 }
+                
             } catch (error) {
                 updateStatus(elements.translatorStatus, 'unavailable', '생성 실패');
                 elements.translateBtn.disabled = true;
                 log(`번역기 생성 실패 (${newSource} → ${newTarget}): ${error.message}`, 'error');
+                
+                let message = '번역기 생성에 실패했습니다.';
+                if (error.message.includes('user gesture')) {
+                    message = '모델 다운로드를 위해 다시 언어를 선택해주세요.';
+                } else if (error.message.includes('지원되지 않습니다')) {
+                    message = '이 언어 쌍은 지원되지 않습니다.';
+                }
+                
+                showNotification(`${newSource} → ${newTarget}: ${message}`, 'error');
             }
         }
         
@@ -871,7 +822,6 @@
         }
         
         // 이벤트 리스너 등록
-        elements.createTranslatorBtn.addEventListener('click', createTranslator);
         elements.translateBtn.addEventListener('click', translateText);
         elements.clearBtn.addEventListener('click', clearText);
         elements.swapBtn.addEventListener('click', swapLanguages);
@@ -899,6 +849,79 @@
             });
         });
         
+        // 적극적 자동 초기화 - 모든 우선순위 언어쌍 생성 시도
+        async function initializeAllTranslators() {
+            log('모든 번역기 자동 초기화를 시작합니다...');
+            updateStatus(elements.poolStatus, 'checking', '초기화 중...');
+            
+            // 우선순위별로 정렬된 모든 언어쌍
+            const sortedPairs = [...priorityLanguagePairs].sort((a, b) => a.priority - b.priority);
+            let initializedCount = 0;
+            let activeTranslatorSet = false;
+            
+            for (let i = 0; i < sortedPairs.length; i++) {
+                const pair = sortedPairs[i];
+                
+                try {
+                    updateStatus(elements.autoCreationStatus, 'checking', 
+                        `${i + 1}/${sortedPairs.length} (${pair.name})`);
+                    
+                    const availability = await checkTranslatorAvailability(pair.source, pair.target);
+                    log(`${pair.name} 가용성: ${availability}`);
+                    
+                    // available인 경우에만 자동 생성 (사용자 제스처 불필요)
+                    if (availability === 'available') {
+                        const translatorInstance = await createSingleTranslator(pair.source, pair.target, true);
+                        
+                        if (translatorInstance) {
+                            initializedCount++;
+                            
+                            // 첫 번째 성공한 번역기를 기본 활성화
+                            if (!activeTranslatorSet) {
+                                translator = translatorInstance;
+                                currentSourceLang = pair.source;
+                                currentTargetLang = pair.target;
+                                updateStatus(elements.translatorStatus, 'available', `${pair.source} → ${pair.target}`);
+                                elements.translateBtn.disabled = false;
+                                
+                                // UI 언어 선택을 현재 번역기에 맞춤
+                                elements.sourceLanguage.value = pair.source;
+                                elements.targetLanguage.value = pair.target;
+                                
+                                log(`기본 번역기 활성화: ${pair.name}`);
+                                showNotification(`${pair.name} 번역기가 준비되었습니다!`);
+                                activeTranslatorSet = true;
+                            }
+                        }
+                    } else if (availability === 'downloadable') {
+                        log(`${pair.name}: 다운로드 필요 (언어 변경 시 자동 생성됨)`);
+                    } else if (availability === 'downloading') {
+                        log(`${pair.name}: 다운로드 중 (완료 후 사용 가능)`);
+                    } else {
+                        log(`${pair.name}: 지원되지 않음`);
+                    }
+                    
+                    // CPU 부하 방지
+                    await new Promise(resolve => setTimeout(resolve, 100));
+                    
+                } catch (error) {
+                    log(`${pair.name} 초기화 실패: ${error.message}`);
+                }
+            }
+            
+            // 최종 상태 업데이트
+            updateStatus(elements.poolStatus, 'available', `${translatorPool.size}개 준비됨`);
+            updateStatus(elements.autoCreationStatus, 'available', `완료 (${initializedCount}/${sortedPairs.length})`);
+            
+            if (!activeTranslatorSet) {
+                log('즉시 사용 가능한 번역기가 없습니다. 언어 선택 시 자동으로 생성됩니다.');
+                updateStatus(elements.translatorStatus, 'unavailable', '언어 선택 시 생성');
+                showNotification('언어를 선택하시면 번역기가 자동으로 생성됩니다.', 'warning');
+            } else {
+                log(`번역기 자동 초기화 완료: ${translatorPool.size}개 준비됨`);
+            }
+        }
+
         // 페이지 로드 시 초기화
         document.addEventListener('DOMContentLoaded', async () => {
             log('Chrome Translator API 테스트 앱을 시작합니다.');
@@ -906,29 +929,8 @@
             
             // 브라우저 지원 확인
             if (checkBrowserSupport()) {
-                // 기본 번역기(en→ko) 즉시 생성하여 바로 사용 가능하게 만들기
-                log('기본 번역기(영어→한국어)를 생성합니다...');
-                
-                try {
-                    // 기본 번역기 즉시 생성
-                    const defaultTranslator = await createSingleTranslator('en', 'ko', false);
-                    if (defaultTranslator) {
-                        translator = defaultTranslator;
-                        currentSourceLang = 'en';
-                        currentTargetLang = 'ko';
-                        updateStatus(elements.translatorStatus, 'available', 'en → ko');
-                        elements.translateBtn.disabled = false;
-                        log('기본 번역기가 준비되었습니다. 바로 번역을 시작할 수 있습니다.');
-                    }
-                } catch (error) {
-                    log('기본 번역기 생성 실패, 백그라운드 생성으로 진행합니다.', 'warning');
-                }
-                
-                // 나머지 번역기들은 백그라운드에서 생성
-                log('추가 번역기들을 백그라운드에서 생성합니다...');
-                setTimeout(() => {
-                    autoCreateTranslators();
-                }, 500);
+                // 모든 번역기 자동 초기화 (사용 가능한 모델만)
+                await initializeAllTranslators();
             }
         });
         

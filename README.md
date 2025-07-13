@@ -38,7 +38,8 @@ Chrome의 AI 번역 기능을 테스트할 수 있는 다국어 번역 도구입
 **주요 기능:**
 - 12개 언어 지원 (한국어, 영어, 중국어, 일본어 등)
 - 실시간 AI 번역 (서버 없이 브라우저에서 직접 처리)
-- 언어쌍 관리 및 교체 기능
+- 자동 번역기 생성 및 언어쌍 관리
+- 언어 선택 시 자동 모델 다운로드
 - 예시 문장 제공으로 빠른 테스트 지원
 
 ### 4. 🏰 Memory Palace Creator (`memory-palace-creator/`)
@@ -90,8 +91,9 @@ http://localhost:8000
 
 ### 3. 첫 번째 테스트
 1. **AI 웹페이지 검색**: `ai-search-test.html` 열기 → 자동 초기화 완료 대기 → 질문 입력
-2. **기억의 궁전**: `memory-palace-creator/index.html` 열기 → 테마 선택 → 외울 내용 입력
-3. **개념 시각화**: `concept-relationship-visualizer/index.html` 열기 → 학습 자료 입력 → 개념 맵 생성
+2. **Chrome 번역기**: `translator-test.html` 열기 → 자동 번역기 생성 대기 → 언어 선택 및 번역
+3. **기억의 궁전**: `memory-palace-creator/index.html` 열기 → 테마 선택 → 외울 내용 입력
+4. **개념 시각화**: `concept-relationship-visualizer/index.html` 열기 → 학습 자료 입력 → 개념 맵 생성
 
 ## 📋 시스템 요구사항
 
