@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Context-Aware Study Helper 📚</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    animation: {
+                        'fade-in': 'fadeIn 0.5s ease-in-out',
+                        'slide-up': 'slideUp 0.3s ease-out',
+                        'pulse-slow': 'pulse 3s infinite',
+                    },
+                    colors: {
+                        primary: {
+                            50: '#f0f9ff',
+                            500: '#667eea',
+                            600: '#5a67d8',
+                            700: '#4c51bf',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        @keyframes slideUp {
+            from { opacity: 0; transform: translateY(30px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .gradient-bg {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        
+        .glass-effect {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        
+        .dark .glass-effect {
+            background: rgba(31, 41, 55, 0.95);
+            border: 1px solid rgba(75, 85, 99, 0.3);
+        }
+        
+        .status-indicator {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 8px;
+        }
+        
+        .status-available { background-color: #10b981; }
+        .status-unavailable { background-color: #ef4444; }
+        .status-downloading { background-color: #f59e0b; animation: pulse 2s infinite; }
+        .status-unknown { background-color: #6b7280; }
+    </style>
+</head>
+<body class="gradient-bg min-h-screen">
+    <!-- 메인 컨테이너 -->
+    <div class="container mx-auto px-4 py-8 max-w-4xl">
+        <!-- 헤더 -->
+        <div class="glass-effect rounded-2xl p-6 mb-6 animate-fade-in">
+            <div class="flex items-center justify-between mb-4">
+                <div>
+                    <h1 class="text-3xl font-bold text-gray-800 dark:text-white mb-2">
+                        📚 Context-Aware Study Helper
+                    </h1>
+                    <p class="text-gray-600 dark:text-gray-300">
+                        AI가 당신의 학습을 도와주는 똑똑한 브라우저 도우미
+                    </p>
+                </div>
+                <button id="darkModeToggle" class="p-2 rounded-lg bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors">
+                    <span class="dark:hidden">🌙</span>
+                    <span class="hidden dark:inline">☀️</span>
+                </button>
+            </div>
+            
+            <!-- API 상태 -->
+            <div id="apiStatus" class="flex items-center p-3 bg-gray-100 dark:bg-gray-800 rounded-lg">
+                <span id="statusIndicator" class="status-indicator status-unknown"></span>
+                <span id="statusText" class="text-sm text-gray-600 dark:text-gray-300">
+                    API 상태 확인 중...
+                </span>
+            </div>
+        </div>
+
+        <!-- 현재 페이지 분석 -->
+        <div class="glass-effect rounded-2xl p-6 mb-6 animate-slide-up">
+            <h2 class="text-xl font-semibold text-gray-800 dark:text-white mb-4">
+                🔍 현재 페이지 분석
+            </h2>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                <div class="p-4 bg-blue-50 dark:bg-blue-900/30 rounded-lg">
+                    <h3 class="font-medium text-blue-800 dark:text-blue-200 mb-2">페이지 정보</h3>
+                    <div id="pageInfo" class="text-sm text-blue-600 dark:text-blue-300">
+                        페이지 정보를 불러오는 중...
+                    </div>
+                </div>
+                <div class="p-4 bg-green-50 dark:bg-green-900/30 rounded-lg">
+                    <h3 class="font-medium text-green-800 dark:text-green-200 mb-2">콘텐츠 타입</h3>
+                    <div id="contentType" class="text-sm text-green-600 dark:text-green-300">
+                        분석 중...
+                    </div>
+                </div>
+            </div>
+            
+            <button id="analyzePageBtn" class="w-full bg-primary-500 hover:bg-primary-600 text-white py-3 px-6 rounded-lg font-medium transition-colors">
+                📖 현재 페이지 분석하기
+            </button>
+        </div>
+
+        <!-- 수동 질문 -->
+        <div class="glass-effect rounded-2xl p-6 mb-6 animate-slide-up" style="animation-delay: 0.1s;">
+            <h2 class="text-xl font-semibold text-gray-800 dark:text-white mb-4">
+                💬 직접 질문하기
+            </h2>
+            
+            <div class="flex flex-col space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        분석 유형 선택
+                    </label>
+                    <select id="analysisType" class="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white">
+                        <option value="general">일반 학습 도움</option>
+                        <option value="definitions">용어 정의</option>
+                        <option value="references">참고자료 제안</option>
+                        <option value="quiz">퀴즈 생성</option>
+                        <option value="summary">내용 요약</option>
+                        <option value="code_explanation">코드 설명</option>
+                    </select>
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        분석할 텍스트 (선택사항)
+                    </label>
+                    <textarea id="customText" placeholder="분석하고 싶은 텍스트를 입력하세요. 비워두면 현재 페이지를 분석합니다."
+                        class="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white resize-none h-32"></textarea>
+                </div>
+                
+                <button id="customAnalyzeBtn" class="bg-green-500 hover:bg-green-600 text-white py-3 px-6 rounded-lg font-medium transition-colors">
+                    🎯 맞춤 분석 시작
+                </button>
+            </div>
+        </div>
+
+        <!-- 분석 결과 -->
+        <div id="analysisResults" class="hidden glass-effect rounded-2xl p-6 mb-6 animate-slide-up">
+            <h2 class="text-xl font-semibold text-gray-800 dark:text-white mb-4">
+                📋 분석 결과
+            </h2>
+            <div id="resultsContent" class="text-gray-700 dark:text-gray-300">
+                <!-- 결과가 여기에 표시됩니다 -->
+            </div>
+        </div>
+
+        <!-- 설정 -->
+        <div class="glass-effect rounded-2xl p-6 mb-6 animate-slide-up" style="animation-delay: 0.2s;">
+            <h2 class="text-xl font-semibold text-gray-800 dark:text-white mb-4">
+                ⚙️ 설정
+            </h2>
+            
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        자동 분석
+                    </label>
+                    <label class="flex items-center">
+                        <input type="checkbox" id="autoAnalysis" checked class="mr-2 w-4 h-4 text-primary-500 border-gray-300 rounded focus:ring-primary-500">
+                        <span class="text-sm text-gray-600 dark:text-gray-400">페이지 변경 시 자동 분석</span>
+                    </label>
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        난이도
+                    </label>
+                    <select id="difficultyLevel" class="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm">
+                        <option value="easy">쉬움</option>
+                        <option value="medium" selected>보통</option>
+                        <option value="hard">어려움</option>
+                    </select>
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        알림 시간
+                    </label>
+                    <select id="notificationDuration" class="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm">
+                        <option value="15">15초</option>
+                        <option value="30" selected>30초</option>
+                        <option value="60">1분</option>
+                        <option value="0">수동 닫기</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <!-- 도움말 -->
+        <div class="glass-effect rounded-2xl p-6 animate-slide-up" style="animation-delay: 0.3s;">
+            <h2 class="text-xl font-semibold text-gray-800 dark:text-white mb-4">
+                ❓ 사용 방법
+            </h2>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                    <h3 class="font-medium text-gray-800 dark:text-white mb-2">🔍 자동 분석</h3>
+                    <ul class="text-sm text-gray-600 dark:text-gray-400 space-y-1">
+                        <li>• Google Docs에서 논문 작성 시 참고문헌 제안</li>
+                        <li>• 코딩 튜토리얼에서 코드 설명 제공</li>
+                        <li>• 학습 자료의 핵심 용어 정의</li>
+                        <li>• 내용에 맞는 퀴즈 자동 생성</li>
+                    </ul>
+                </div>
+                
+                <div>
+                    <h3 class="font-medium text-gray-800 dark:text-white mb-2">💻 시스템 요구사항</h3>
+                    <ul class="text-sm text-gray-600 dark:text-gray-400 space-y-1">
+                        <li>• Chrome 127+ (Chrome Canary 권장)</li>
+                        <li>• chrome://flags에서 Gemini Nano 활성화</li>
+                        <li>• 약 22GB 저장공간 (모델 다운로드)</li>
+                        <li>• 안정적인 인터넷 연결 (최초 설정시)</li>
+                    </ul>
+                </div>
+            </div>
+            
+            <div class="mt-4 p-3 bg-yellow-50 dark:bg-yellow-900/30 rounded-lg">
+                <p class="text-sm text-yellow-800 dark:text-yellow-200">
+                    💡 <strong>팁:</strong> 모든 분석은 브라우저에서 로컬로 처리되어 개인정보가 안전하게 보호됩니다.
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <!-- 로딩 오버레이 -->
+    <div id="loadingOverlay" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div class="glass-effect rounded-2xl p-8 text-center">
+            <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-500 mx-auto mb-4"></div>
+            <p class="text-gray-800 dark:text-white font-medium">AI가 분석 중입니다...</p>
+            <p class="text-sm text-gray-600 dark:text-gray-400 mt-2">잠시만 기다려주세요</p>
+        </div>
+    </div>
+
+    <!-- JavaScript 모듈 로드 -->
+    <script src="js/gemini-api.js"></script>
+    <script src="js/content-analyzer.js"></script>
+    <script src="js/study-assistant.js"></script>
+    <script src="js/app.js"></script>
+</body>
+</html>
