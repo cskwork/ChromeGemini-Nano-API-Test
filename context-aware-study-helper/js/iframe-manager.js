@@ -188,48 +188,57 @@ class IframeManager {
         this.showLoading(false);
         this.isLoading = false;
         
-        let actualUrl = this.currentUrl;
+        let actualUrl;
         
         try {
             // iframe의 현재 URL 가져오기 시도 (Same-origin policy 제한으로 실패할 수 있음)
-            const iframeUrl = this.iframe.contentWindow.location.href;
-            if (iframeUrl && iframeUrl !== 'about:blank') {
-                actualUrl = iframeUrl;
-                this.currentUrl = iframeUrl;
-                this.urlInput.value = iframeUrl;
-                console.log('iframe URL 직접 접근 성공:', actualUrl);
+            actualUrl = this.iframe.contentWindow.location.href;
+
+            if (actualUrl && actualUrl !== 'about:blank') {
+                this.currentUrl = actualUrl;
+                this.urlInput.value = actualUrl;
+                this.urlInput.placeholder = 'https://...'; // placeholder 초기화
+
+                // 히스토리에 추가 (중복 방지)
+                if (actualUrl !== this.navigationHistory[this.currentHistoryIndex]) {
+                    this.addToHistory(actualUrl);
+                }
+                
+                this.showMessage('페이지 로드 완료', 'success');
+                console.log('iframe 로드 완료 (Same-origin):', actualUrl);
+
+            } else {
+                // about:blank or other empty states, do nothing special
+                actualUrl = this.currentUrl;
             }
+
         } catch (error) {
-            // Cross-origin 제한으로 인한 오류 - 대체 방법 시도
-            console.log('iframe URL 직접 접근 제한, 대체 방법 시도');
+            // Cross-origin 제한으로 인한 오류
+            actualUrl = this.currentUrl; // 이전 URL을 유지
+            console.warn('Cross-origin navigation detected. Cannot access iframe URL directly.');
             
-            // iframe의 src 속성에서 URL 추정
-            const srcUrl = this.iframe.src;
-            if (srcUrl && srcUrl !== 'about:blank') {
-                actualUrl = srcUrl;
-                this.currentUrl = srcUrl;
-                this.urlInput.value = srcUrl;
-                console.log('iframe src에서 URL 추정:', actualUrl);
+            this.urlInput.value = ''; // 입력창 비우기
+            this.urlInput.placeholder = '다른 도메인으로 이동했습니다. URL을 직접 입력해주세요.';
+            
+            this.showMessage(
+                '다른 도메인으로 이동하여 URL 동기화가 끊겼습니다. 콘텐츠를 분석하려면 현재 페이지의 URL을 위 주소창에 입력하고 "Go"를 누르세요.',
+                'warning'
+            );
+            
+            // 다른 컴포넌트에는 분석할 URL이 없음을 알림
+            actualUrl = ''; 
+        } finally {
+            // 네비게이션 버튼 상태는 항상 업데이트
+            this.updateNavigationButtons();
+
+            // 다른 모듈에 페이지 변경 알림
+            if (window.studyHelperApp && window.studyHelperApp.onIframePageChange) {
+                window.studyHelperApp.onIframePageChange(actualUrl);
+            }
+            if (window.contentAnalyzer && window.contentAnalyzer.onIframeUrlChange) {
+                window.contentAnalyzer.onIframeUrlChange(actualUrl);
             }
         }
-        
-        // 히스토리에 추가 (중복 방지)
-        if (actualUrl && actualUrl !== this.navigationHistory[this.navigationHistory.length - 1]) {
-            this.addToHistory(actualUrl);
-        }
-        
-        // Study Helper에 페이지 변경 알림
-        if (window.studyHelperApp && window.studyHelperApp.onIframePageChange) {
-            window.studyHelperApp.onIframePageChange(actualUrl);
-        }
-        
-        // Content Analyzer에 알림
-        if (window.contentAnalyzer && window.contentAnalyzer.onIframeUrlChange) {
-            window.contentAnalyzer.onIframeUrlChange(actualUrl);
-        }
-        
-        this.showMessage('페이지 로드 완료', 'success');
-        console.log('iframe 로드 완료:', actualUrl);
     }
 
     /**

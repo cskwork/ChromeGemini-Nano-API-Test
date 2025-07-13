@@ -46,8 +46,8 @@ class ContentAnalyzer {
                 // iframe에서 콘텐츠 추출
                 return await this.extractIframeContent();
             } else {
-                // 기존 방식으로 현재 페이지에서 추출
-                return this.extractCurrentPageContent();
+                // 기존 방식으로 현재 페이지s에서 추출
+                //return this.extractCurrentPageContent();
             }
         } catch (error) {
             console.error('콘텐츠 추출 오류:', error);
@@ -242,7 +242,7 @@ class ContentAnalyzer {
     /**
      * 코딩 사이트 콘텐츠 추출
      */
-    extractCodingContent() {
+    extractCodingContent(baseTextContent = '') {
         try {
             // 코드 블록들 추출
             const codeBlocks = document.querySelectorAll('code, pre, .highlight, .code-block');
@@ -253,8 +253,8 @@ class ContentAnalyzer {
                 codeContent += '\n---\n';
             });
 
-            // 튜토리얼 텍스트도 함께 추출
-            const textContent = this.extractPageContent().content;
+            // 튜토리얼 텍스트도 함께 추출 (전달받은 base content 사용)
+            const textContent = baseTextContent;
             
             return {
                 code: codeContent,
@@ -375,7 +375,7 @@ class ContentAnalyzer {
                 };
 
             case 'coding':
-                const codingContent = this.extractCodingContent();
+                const codingContent = this.extractCodingContent(baseContent.content);
                 return {
                     ...baseContent,
                     specialContent: codingContent,

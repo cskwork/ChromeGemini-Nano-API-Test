@@ -101,7 +101,8 @@ class BrowserlessFetcher {
                 headers: {
                     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
                 },
-                signal: controller.signal
+                signal: controller.signal,
+                redirect: 'follow' // 리디렉션 자동 추적
             });
             
             clearTimeout(timeoutId);
@@ -109,9 +110,13 @@ class BrowserlessFetcher {
             if (!response.ok) {
                 throw new Error(`HTTP ${response.status}: ${response.statusText}`);
             }
+
+            // 최종 URL 가져오기 (리디렉션된 경우)
+            const finalUrl = response.url;
+            console.log('Direct fetch 최종 URL:', finalUrl);
             
             const html = await response.text();
-            return this.parseHtmlContent(html, url);
+            return this.parseHtmlContent(html, finalUrl);
             
         } catch (error) {
             clearTimeout(timeoutId);
@@ -194,6 +199,7 @@ class BrowserlessFetcher {
             }
             
             let html;
+            let finalUrl = url; // 기본적으로 원래 URL 사용
             const contentType = response.headers.get('content-type') || '';
             
             try {
@@ -201,9 +207,21 @@ class BrowserlessFetcher {
                     // JSON 응답 처리
                     const data = await response.json();
                     html = data.contents || data.content || data.data || data.response || '';
+
+                    // allorigins.win 프록시는 최종 URL 정보를 제공
+                    if (proxy.includes('allorigins.win') && data.status && data.status.url) {
+                        finalUrl = data.status.url;
+                        console.log('allorigins 프록시에서 최종 URL 발견:', finalUrl);
+                    }
                 } else {
                     // HTML 응답 처리
                     html = await response.text();
+                    // 'x-final-url' 같은 커스텀 헤더를 확인 (이상적)
+                    const headerFinalUrl = response.headers.get('x-final-url');
+                    if (headerFinalUrl) {
+                        finalUrl = headerFinalUrl;
+                        console.log('프록시 응답 헤더에서 최종 URL 발견:', finalUrl);
+                    }
                 }
             } catch (parseError) {
                 // 파싱 실패 시 텍스트로 재시도
@@ -215,7 +233,7 @@ class BrowserlessFetcher {
             }
             
             console.log(`프록시 콘텐츠 가져오기 성공: ${html.length}자`);
-            return this.parseHtmlContent(html, url);
+            return this.parseHtmlContent(html, finalUrl);
             
         } catch (error) {
             clearTimeout(timeoutId);
@@ -285,7 +303,7 @@ class BrowserlessFetcher {
                 success: true,
                 title: data.title || '',
                 content: data.extract || '',
-                url: url,
+                url: data.content_urls?.desktop?.page || url,
                 contentType: 'encyclopedia',
                 wordCount: (data.extract || '').split(/\s+/).length,
                 extractedAt: new Date().toISOString(),
@@ -412,11 +430,13 @@ class BrowserlessFetcher {
                 content += '\n\n' + post.selftext;
             }
             
+            const finalUrl = post.permalink ? `https://www.reddit.com${post.permalink}` : url;
+            
             return {
                 success: true,
                 title: post.title || '',
                 content: content,
-                url: url,
+                url: finalUrl,
                 contentType: 'general',
                 wordCount: content.split(/\s+/).length,
                 extractedAt: new Date().toISOString(),
