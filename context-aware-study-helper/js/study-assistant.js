@@ -74,9 +74,15 @@ class StudyAssistant {
             // 콘텐츠 추출 및 분석 (await 추가)
             const contentData = await this.contentAnalyzer.extractContextualContent();
             
-            // 콘텐츠 존재 여부 및 유효성 검증
+            // 콘텐츠 존재 여부 및 유효성 검증 (fetch 전용 분석)
             if (!contentData || !contentData.content || typeof contentData.content !== 'string') {
                 console.warn('콘텐츠 데이터가 유효하지 않음:', contentData);
+                return;
+            }
+            
+            // fetch 실패 시 분석 중단
+            if (contentData.error === 'fetch_failed' || contentData.error === 'browserless_unavailable') {
+                console.log('fetch 실패로 자동 분석 중단:', contentData.error);
                 return;
             }
             

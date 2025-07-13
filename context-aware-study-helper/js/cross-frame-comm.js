@@ -464,9 +464,19 @@ class CrossFrameComm {
     handlePageChanged(data) {
         console.log('iframe 페이지 변경 감지:', data);
         
+        // iframe-manager에 URL 업데이트 알림
+        if (window.iframeManager) {
+            window.iframeManager.updateCurrentUrl(data.url);
+        }
+        
         // Study Helper에 알림
         if (window.studyHelperApp) {
             window.studyHelperApp.onIframePageChange(data.url);
+        }
+        
+        // Content Analyzer에 알림
+        if (window.contentAnalyzer) {
+            window.contentAnalyzer.onIframeUrlChange(data.url);
         }
     }
 
@@ -514,24 +524,41 @@ class CrossFrameComm {
             try {
                 const currentUrl = this.iframe.contentWindow.location.href;
                 if (currentUrl !== lastUrl && currentUrl !== 'about:blank') {
+                    console.log('CrossFrameComm URL 변경 감지:', lastUrl, '→', currentUrl);
                     lastUrl = currentUrl;
                     this.handlePageChanged({ url: currentUrl });
                 }
             } catch (error) {
-                // Cross-origin 제한으로 인한 오류는 무시
+                // Cross-origin 제한으로 인한 오류 - iframe src에서 추정
+                const srcUrl = this.iframe.src;
+                if (srcUrl && srcUrl !== lastUrl && srcUrl !== 'about:blank') {
+                    console.log('CrossFrameComm URL src에서 추정:', lastUrl, '→', srcUrl);
+                    lastUrl = srcUrl;
+                    this.handlePageChanged({ url: srcUrl });
+                }
             }
         };
         
-        // 주기적으로 URL 체크
-        setInterval(checkUrl, 2000);
+        // 주기적으로 URL 체크 (더 빈번하게)
+        this.urlCheckInterval = setInterval(checkUrl, 800);
+        
+        // 초기 URL 체크
+        setTimeout(checkUrl, 200);
     }
 
     /**
      * 정리 및 종료
      */
     destroy() {
+        // URL 체크 interval 정리
+        if (this.urlCheckInterval) {
+            clearInterval(this.urlCheckInterval);
+            this.urlCheckInterval = null;
+        }
+        
         this.messageHandlers.clear();
         this.iframe = null;
+        this.isListening = false;
         console.log('CrossFrameComm 정리 완료');
     }
 }

@@ -64,6 +64,13 @@ class StudyHelperApp {
                 console.warn('iframe 모듈들이 아직 로드되지 않았습니다.');
                 return false;
             }
+            
+            // URL 모니터링 시작
+            if (this.crossFrameComm.startUrlMonitoring) {
+                this.crossFrameComm.startUrlMonitoring();
+                console.log('URL 모니터링 시작');
+            }
+            
             return true;
         };
         
@@ -278,7 +285,7 @@ class StudyHelperApp {
             // iframe에서 콘텐츠 추출 (비동기)
             const contentData = await this.contentAnalyzer.extractContextualContent();
             
-            // 콘텐츠 추출 실패 처리
+            // 콘텐츠 추출 실패 처리 (fetch 전용 분석)
             if (contentData.error || contentData.isBlocked) {
                 this.handleBlockedContent(contentData);
                 this.showLoading(false);
@@ -320,13 +327,35 @@ class StudyHelperApp {
         const currentUrl = this.iframeManager?.getCurrentUrl() || '';
         const siteName = this.extractSiteName(currentUrl);
         
+        // 에러 타입별 메시지 설정
+        let title, message, icon;
+        
+        switch (contentData.error) {
+            case 'fetch_failed':
+                title = `${siteName} fetch 실패`;
+                message = 'URL에서 콘텐츠를 가져올 수 없습니다. 사이트가 CORS 정책으로 차단하거나 프록시 서버가 불안정할 수 있습니다.';
+                icon = '🌐';
+                break;
+                
+            case 'browserless_unavailable':
+                title = `${siteName} 분석 불가`;
+                message = '브라우저리스 콘텐츠 추출이 비활성화되어 있습니다. fetch 전용 분석 모드에서는 이 사이트를 분석할 수 없습니다.';
+                icon = '⚙️';
+                break;
+                
+            default:
+                title = `${siteName} 분석 제한`;
+                message = '이 사이트는 보안상의 이유로 iframe 내에서의 콘텐츠 분석을 차단했습니다.';
+                icon = '🚫';
+        }
+        
         resultsContent.innerHTML = `
             <div class="p-4 bg-yellow-50 dark:bg-yellow-900/30 rounded-lg border border-yellow-200 dark:border-yellow-700">
                 <h3 class="text-yellow-800 dark:text-yellow-200 font-medium mb-3 flex items-center">
-                    🚫 ${siteName} 분석 제한
+                    ${icon} ${title}
                 </h3>
                 <p class="text-yellow-700 dark:text-yellow-300 text-sm mb-4">
-                    이 사이트는 보안상의 이유로 iframe 내에서의 콘텐츠 분석을 차단했습니다.
+                    ${message}
                 </p>
                 
                 <div class="space-y-3">
@@ -344,6 +373,15 @@ class StudyHelperApp {
                         ${this.generateQuickAccessButtons()}
                     </div>
                 </div>
+                
+                ${contentData.error === 'fetch_failed' ? `
+                <div class="mt-4 p-3 bg-blue-50 dark:bg-blue-900/30 rounded border border-blue-200 dark:border-blue-700">
+                    <h5 class="text-sm font-medium text-blue-800 dark:text-blue-200 mb-2">🔧 fetch 전용 분석 모드</h5>
+                    <p class="text-blue-700 dark:text-blue-300 text-xs">
+                        현재 fetch URL에서 가져온 콘텐츠만 분석합니다. 이는 더 정확한 분석을 위한 설정입니다.
+                    </p>
+                </div>
+                ` : ''}
             </div>
         `;
         

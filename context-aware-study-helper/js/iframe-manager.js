@@ -188,25 +188,48 @@ class IframeManager {
         this.showLoading(false);
         this.isLoading = false;
         
+        let actualUrl = this.currentUrl;
+        
         try {
-            // iframe의 현재 URL 가져오기 (Same-origin policy 제한으로 실패할 수 있음)
+            // iframe의 현재 URL 가져오기 시도 (Same-origin policy 제한으로 실패할 수 있음)
             const iframeUrl = this.iframe.contentWindow.location.href;
             if (iframeUrl && iframeUrl !== 'about:blank') {
+                actualUrl = iframeUrl;
                 this.currentUrl = iframeUrl;
                 this.urlInput.value = iframeUrl;
+                console.log('iframe URL 직접 접근 성공:', actualUrl);
             }
         } catch (error) {
-            // Cross-origin 제한으로 인한 오류는 무시
-            console.log('iframe URL 접근 제한 (정상적인 cross-origin 동작)');
+            // Cross-origin 제한으로 인한 오류 - 대체 방법 시도
+            console.log('iframe URL 직접 접근 제한, 대체 방법 시도');
+            
+            // iframe의 src 속성에서 URL 추정
+            const srcUrl = this.iframe.src;
+            if (srcUrl && srcUrl !== 'about:blank') {
+                actualUrl = srcUrl;
+                this.currentUrl = srcUrl;
+                this.urlInput.value = srcUrl;
+                console.log('iframe src에서 URL 추정:', actualUrl);
+            }
+        }
+        
+        // 히스토리에 추가 (중복 방지)
+        if (actualUrl && actualUrl !== this.navigationHistory[this.navigationHistory.length - 1]) {
+            this.addToHistory(actualUrl);
         }
         
         // Study Helper에 페이지 변경 알림
         if (window.studyHelperApp && window.studyHelperApp.onIframePageChange) {
-            window.studyHelperApp.onIframePageChange(this.currentUrl);
+            window.studyHelperApp.onIframePageChange(actualUrl);
+        }
+        
+        // Content Analyzer에 알림
+        if (window.contentAnalyzer && window.contentAnalyzer.onIframeUrlChange) {
+            window.contentAnalyzer.onIframeUrlChange(actualUrl);
         }
         
         this.showMessage('페이지 로드 완료', 'success');
-        console.log('iframe 로드 완료:', this.currentUrl);
+        console.log('iframe 로드 완료:', actualUrl);
     }
 
     /**
@@ -414,6 +437,24 @@ class IframeManager {
      */
     getCurrentUrl() {
         return this.currentUrl;
+    }
+    
+    /**
+     * 현재 URL 업데이트 (외부에서 호출)
+     */
+    updateCurrentUrl(newUrl) {
+        if (newUrl && newUrl !== this.currentUrl) {
+            console.log('iframe-manager URL 업데이트:', this.currentUrl, '→', newUrl);
+            this.currentUrl = newUrl;
+            this.urlInput.value = newUrl;
+            
+            // 히스토리에 추가 (중복 방지)
+            if (newUrl !== this.navigationHistory[this.navigationHistory.length - 1]) {
+                this.addToHistory(newUrl);
+            }
+            
+            this.updateNavigationButtons();
+        }
     }
 
     /**

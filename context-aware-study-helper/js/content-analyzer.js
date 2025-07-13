@@ -68,7 +68,7 @@ class ContentAnalyzer {
         const currentUrl = this.iframeManager?.getCurrentUrl() || '';
         
         try {
-            // 1. 브라우저리스 방식 먼저 시도 (더 안정적)
+            // 브라우저리스 방식(fetch)만 사용 - iframe DOM 추출 제외
             if (this.preferBrowserless && this.browserlessFetcher && currentUrl) {
                 console.log('브라우저리스 방식으로 콘텐츠 추출 시도:', currentUrl);
                 
@@ -92,46 +92,40 @@ class ContentAnalyzer {
                         extractedAt: browserlessResult.extractedAt || new Date().toISOString()
                     };
                 } else {
-                    console.log('브라우저리스 추출 실패, iframe 방식으로 대체:', browserlessResult.error);
+                    console.log('브라우저리스 추출 실패 - fetch 콘텐츠만 분석:', browserlessResult.error);
+                    
+                    // fetch 실패 시 분석하지 않음
+                    return {
+                        content: '',
+                        contentType: 'blocked',
+                        length: 0,
+                        wordCount: 0,
+                        error: 'fetch_failed',
+                        message: 'fetch URL에서 콘텐츠를 가져오지 못했습니다.',
+                        fallbackMethods: [
+                            '새 탭에서 사이트 열기',
+                            '텍스트 복사하여 맞춤 분석 사용',
+                            '분석 지원 사이트로 이동'
+                        ],
+                        url: currentUrl
+                    };
                 }
             }
             
-            // 2. 기존 iframe 방식으로 시도
-            const result = await this.crossFrameComm.extractContentFromIframe();
-            
-            if (result.success) {
-                // 성공적으로 추출된 경우
-                this.currentContent = result.content || '';
-                this.contentType = result.contentType || this.detectContentType(this.currentContent);
-                this.lastAnalyzedUrl = result.url || '';
-                
-                return {
-                    content: this.currentContent,
-                    contentType: this.contentType,
-                    length: this.currentContent.length,
-                    wordCount: result.wordCount || this.currentContent.split(/\s+/).length,
-                    title: result.title || '',
-                    url: result.url || '',
-                    extractionMethod: result.method || 'iframe',
-                    extractedAt: result.extractedAt || new Date().toISOString()
-                };
-            } else {
-                // 모든 방법 실패 시 최종 대안 제시
-                return {
-                    content: '',
-                    contentType: 'blocked',
-                    length: 0,
-                    wordCount: 0,
-                    error: 'all_methods_failed',
-                    message: '모든 콘텐츠 추출 방법이 실패했습니다.',
-                    fallbackMethods: [
-                        '북마클릿 사용 (가장 안정적)',
-                        '새 탭에서 열어서 텍스트 복사',
-                        '콘텐츠를 직접 입력하여 맞춤 분석'
-                    ],
-                    url: currentUrl
-                };
-            }
+            // 브라우저리스 방식을 사용할 수 없는 경우
+            return {
+                content: '',
+                contentType: 'unavailable',
+                length: 0,
+                wordCount: 0,
+                error: 'browserless_unavailable',
+                message: '브라우저리스 콘텐츠 추출이 비활성화되었습니다.',
+                fallbackMethods: [
+                    '새 탭에서 사이트 열기',
+                    '맞춤 분석 사용'
+                ],
+                url: currentUrl
+            };
             
         } catch (error) {
             console.error('콘텐츠 추출 오류:', error);
@@ -142,9 +136,10 @@ class ContentAnalyzer {
                 wordCount: 0,
                 error: error.message,
                 fallbackMethods: [
-                    '북마클릿 사용',
+                    '새 탭에서 사이트 열기',
                     '수동 텍스트 입력'
-                ]
+                ],
+                url: currentUrl
             };
         }
     }
@@ -552,14 +547,20 @@ class ContentAnalyzer {
         let lastUrl = '';
         const checkUrlChange = () => {
             const currentUrl = this.iframeManager.getCurrentUrl();
-            if (currentUrl !== lastUrl && currentUrl) {
+            if (currentUrl !== lastUrl && currentUrl && currentUrl !== 'about:blank') {
+                console.log('URL 변경 감지:', lastUrl, '→', currentUrl);
                 lastUrl = currentUrl;
                 this.onIframeUrlChange(currentUrl);
             }
         };
         
-        // 주기적으로 URL 체크
-        setInterval(checkUrlChange, 2000);
+        // 주기적으로 URL 체크 (더 짧은 간격으로)
+        this.urlCheckInterval = setInterval(checkUrlChange, 1000);
+        
+        // 초기 URL 설정
+        setTimeout(() => {
+            checkUrlChange();
+        }, 500);
     }
 
     /**
@@ -617,6 +618,13 @@ class ContentAnalyzer {
      */
     destroy() {
         this.stopPageMonitoring();
+        
+        // URL 체크 interval 정리
+        if (this.urlCheckInterval) {
+            clearInterval(this.urlCheckInterval);
+            this.urlCheckInterval = null;
+        }
+        
         this.crossFrameComm = null;
         this.iframeManager = null;
         console.log('ContentAnalyzer (Enhanced) 정리 완료');
