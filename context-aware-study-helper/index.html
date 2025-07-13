@@ -13,6 +13,7 @@
                     animation: {
                         'fade-in': 'fadeIn 0.5s ease-in-out',
                         'slide-up': 'slideUp 0.3s ease-out',
+                        'slide-in': 'slideInLeft 0.3s ease-out',
                         'pulse-slow': 'pulse 3s infinite',
                     },
                     colors: {
@@ -22,6 +23,10 @@
                             600: '#5a67d8',
                             700: '#4c51bf',
                         }
+                    },
+                    width: {
+                        'sidebar': '380px',
+                        'sidebar-collapsed': '60px',
                     }
                 }
             }
@@ -36,6 +41,11 @@
         @keyframes slideUp {
             from { opacity: 0; transform: translateY(30px); }
             to { opacity: 1; transform: translateY(0); }
+        }
+        
+        @keyframes slideInLeft {
+            from { opacity: 0; transform: translateX(-20px); }
+            to { opacity: 1; transform: translateX(0); }
         }
         
         .gradient-bg {
@@ -65,182 +75,310 @@
         .status-unavailable { background-color: #ef4444; }
         .status-downloading { background-color: #f59e0b; animation: pulse 2s infinite; }
         .status-unknown { background-color: #6b7280; }
+        
+        /* Split layout styles */
+        .split-container {
+            display: flex;
+            height: 100vh;
+            overflow: hidden;
+        }
+        
+        .sidebar {
+            transition: width 0.3s ease;
+            overflow-y: auto;
+            overflow-x: hidden;
+        }
+        
+        .sidebar.collapsed {
+            width: 60px !important;
+        }
+        
+        .sidebar.collapsed .sidebar-content > *:not(.collapse-toggle) {
+            display: none;
+        }
+        
+        .main-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            background: white;
+            border-left: 1px solid rgba(0,0,0,0.1);
+        }
+        
+        .navigation-bar {
+            background: #f8fafc;
+            border-bottom: 1px solid rgba(0,0,0,0.1);
+            padding: 10px 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .dark .navigation-bar {
+            background: #1f2937;
+            border-bottom: 1px solid rgba(75, 85, 99, 0.3);
+        }
+        
+        .browser-container {
+            flex: 1;
+            position: relative;
+            background: white;
+        }
+        
+        .browser-iframe {
+            width: 100%;
+            height: 100%;
+            border: none;
+        }
+        
+        .loading-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(255, 255, 255, 0.9);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 10;
+        }
+        
+        .dark .loading-overlay {
+            background: rgba(31, 41, 55, 0.9);
+        }
+        
+        /* URL 입력 박스 스타일 */
+        .url-input {
+            flex: 1;
+            padding: 8px 12px;
+            border: 1px solid #d1d5db;
+            border-radius: 6px;
+            font-size: 14px;
+        }
+        
+        .dark .url-input {
+            background: #374151;
+            border-color: #4b5563;
+            color: white;
+        }
+        
+        .nav-button {
+            padding: 8px 12px;
+            background: #f3f4f6;
+            border: 1px solid #d1d5db;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        
+        .nav-button:hover {
+            background: #e5e7eb;
+        }
+        
+        .dark .nav-button {
+            background: #374151;
+            border-color: #4b5563;
+            color: white;
+        }
+        
+        .dark .nav-button:hover {
+            background: #4b5563;
+        }
     </style>
 </head>
-<body class="gradient-bg min-h-screen">
-    <!-- 메인 컨테이너 -->
-    <div class="container mx-auto px-4 py-8 max-w-4xl">
-        <!-- 헤더 -->
-        <div class="glass-effect rounded-2xl p-6 mb-6 animate-fade-in">
-            <div class="flex items-center justify-between mb-4">
-                <div>
-                    <h1 class="text-3xl font-bold text-gray-800 dark:text-white mb-2">
-                        📚 Context-Aware Study Helper
-                    </h1>
-                    <p class="text-gray-600 dark:text-gray-300">
-                        AI가 당신의 학습을 도와주는 똑똑한 브라우저 도우미
-                    </p>
+<body class="dark:bg-gray-900">
+    <!-- Split Layout Container -->
+    <div class="split-container">
+        <!-- Study Helper Sidebar -->
+        <div id="sidebar" class="sidebar gradient-bg w-sidebar">
+            <div class="sidebar-content p-4">
+                <!-- 토글 버튼 -->
+                <div class="collapse-toggle flex justify-between items-center mb-4">
+                    <h1 class="text-xl font-bold text-white">📚 Study Helper</h1>
+                    <button id="sidebarToggle" class="text-white hover:bg-white/20 p-2 rounded-lg transition-colors">
+                        <span id="toggleIcon">◀</span>
+                    </button>
                 </div>
-                <button id="darkModeToggle" class="p-2 rounded-lg bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors">
-                    <span class="dark:hidden">🌙</span>
-                    <span class="hidden dark:inline">☀️</span>
-                </button>
-            </div>
-            
-            <!-- API 상태 -->
-            <div id="apiStatus" class="flex items-center p-3 bg-gray-100 dark:bg-gray-800 rounded-lg">
-                <span id="statusIndicator" class="status-indicator status-unknown"></span>
-                <span id="statusText" class="text-sm text-gray-600 dark:text-gray-300">
-                    API 상태 확인 중...
-                </span>
-            </div>
-        </div>
-
-        <!-- 현재 페이지 분석 -->
-        <div class="glass-effect rounded-2xl p-6 mb-6 animate-slide-up">
-            <h2 class="text-xl font-semibold text-gray-800 dark:text-white mb-4">
-                🔍 현재 페이지 분석
-            </h2>
-            
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                <div class="p-4 bg-blue-50 dark:bg-blue-900/30 rounded-lg">
-                    <h3 class="font-medium text-blue-800 dark:text-blue-200 mb-2">페이지 정보</h3>
-                    <div id="pageInfo" class="text-sm text-blue-600 dark:text-blue-300">
-                        페이지 정보를 불러오는 중...
+                
+                <!-- API 상태 -->
+                <div class="glass-effect rounded-lg p-4 mb-4 animate-fade-in">
+                    <div class="flex items-center justify-between mb-3">
+                        <h2 class="text-sm font-semibold text-gray-800 dark:text-white">AI 상태</h2>
+                        <button id="darkModeToggle" class="p-1 rounded bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors">
+                            <span class="dark:hidden text-xs">🌙</span>
+                            <span class="hidden dark:inline text-xs">☀️</span>
+                        </button>
+                    </div>
+                    <div id="apiStatus" class="flex items-center p-2 bg-gray-100 dark:bg-gray-800 rounded">
+                        <span id="statusIndicator" class="status-indicator status-unknown"></span>
+                        <span id="statusText" class="text-xs text-gray-600 dark:text-gray-300">
+                            API 상태 확인 중...
+                        </span>
                     </div>
                 </div>
-                <div class="p-4 bg-green-50 dark:bg-green-900/30 rounded-lg">
-                    <h3 class="font-medium text-green-800 dark:text-green-200 mb-2">콘텐츠 타입</h3>
-                    <div id="contentType" class="text-sm text-green-600 dark:text-green-300">
-                        분석 중...
+
+                <!-- 현재 페이지 분석 -->
+                <div class="glass-effect rounded-lg p-4 mb-4 animate-slide-up">
+                    <h2 class="text-sm font-semibold text-gray-800 dark:text-white mb-3">
+                        🔍 페이지 분석
+                    </h2>
+                    
+                    <div class="space-y-3 mb-4">
+                        <div class="p-3 bg-blue-50 dark:bg-blue-900/30 rounded">
+                            <h3 class="text-xs font-medium text-blue-800 dark:text-blue-200 mb-1">페이지 정보</h3>
+                            <div id="pageInfo" class="text-xs text-blue-600 dark:text-blue-300">
+                                페이지 정보를 불러오는 중...
+                            </div>
+                        </div>
+                        <div class="p-3 bg-green-50 dark:bg-green-900/30 rounded">
+                            <h3 class="text-xs font-medium text-green-800 dark:text-green-200 mb-1">콘텐츠 타입</h3>
+                            <div id="contentType" class="text-xs text-green-600 dark:text-green-300">
+                                분석 중...
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <button id="analyzePageBtn" class="w-full bg-primary-500 hover:bg-primary-600 text-white py-2 px-4 rounded text-sm font-medium transition-colors">
+                        📖 페이지 분석하기
+                    </button>
+                </div>
+
+                <!-- 수동 질문 -->
+                <div class="glass-effect rounded-lg p-4 mb-4 animate-slide-up" style="animation-delay: 0.1s;">
+                    <h2 class="text-sm font-semibold text-gray-800 dark:text-white mb-3">
+                        💬 맞춤 분석
+                    </h2>
+                    
+                    <div class="space-y-3">
+                        <div>
+                            <label class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                분석 유형
+                            </label>
+                            <select id="analysisType" class="w-full p-2 border border-gray-300 dark:border-gray-600 rounded text-xs bg-white dark:bg-gray-800 text-gray-900 dark:text-white">
+                                <option value="general">일반 학습 도움</option>
+                                <option value="definitions">용어 정의</option>
+                                <option value="references">참고자료 제안</option>
+                                <option value="quiz">퀴즈 생성</option>
+                                <option value="summary">내용 요약</option>
+                                <option value="code_explanation">코드 설명</option>
+                            </select>
+                        </div>
+                        
+                        <div>
+                            <label class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                분석할 텍스트 (선택사항)
+                            </label>
+                            <textarea id="customText" placeholder="텍스트 입력..."
+                                class="w-full p-2 border border-gray-300 dark:border-gray-600 rounded text-xs bg-white dark:bg-gray-800 text-gray-900 dark:text-white resize-none h-20"></textarea>
+                        </div>
+                        
+                        <button id="customAnalyzeBtn" class="w-full bg-green-500 hover:bg-green-600 text-white py-2 px-4 rounded text-sm font-medium transition-colors">
+                            🎯 맞춤 분석
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 분석 결과 -->
+                <div id="analysisResults" class="hidden glass-effect rounded-lg p-4 mb-4 animate-slide-up">
+                    <h2 class="text-sm font-semibold text-gray-800 dark:text-white mb-3">
+                        📋 분석 결과
+                    </h2>
+                    <div id="resultsContent" class="text-xs text-gray-700 dark:text-gray-300 max-h-40 overflow-y-auto">
+                        <!-- 결과가 여기에 표시됩니다 -->
+                    </div>
+                </div>
+
+                <!-- 설정 -->
+                <div class="glass-effect rounded-lg p-4 mb-4 animate-slide-up" style="animation-delay: 0.2s;">
+                    <h2 class="text-sm font-semibold text-gray-800 dark:text-white mb-3">
+                        ⚙️ 설정
+                    </h2>
+                    
+                    <div class="space-y-3">
+                        <div>
+                            <label class="flex items-center">
+                                <input type="checkbox" id="autoAnalysis" checked class="mr-2 w-3 h-3 text-primary-500 border-gray-300 rounded focus:ring-primary-500">
+                                <span class="text-xs text-gray-600 dark:text-gray-400">자동 분석</span>
+                            </label>
+                        </div>
+                        
+                        <div>
+                            <label class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                난이도
+                            </label>
+                            <select id="difficultyLevel" class="w-full p-1 border border-gray-300 dark:border-gray-600 rounded text-xs bg-white dark:bg-gray-800 text-gray-900 dark:text-white">
+                                <option value="easy">쉬움</option>
+                                <option value="medium" selected>보통</option>
+                                <option value="hard">어려움</option>
+                            </select>
+                        </div>
+                        
+                        <div>
+                            <label class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                알림 시간
+                            </label>
+                            <select id="notificationDuration" class="w-full p-1 border border-gray-300 dark:border-gray-600 rounded text-xs bg-white dark:bg-gray-800 text-gray-900 dark:text-white">
+                                <option value="15">15초</option>
+                                <option value="30" selected>30초</option>
+                                <option value="60">1분</option>
+                                <option value="0">수동 닫기</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 도움말 -->
+                <div class="glass-effect rounded-lg p-4 animate-slide-up" style="animation-delay: 0.3s;">
+                    <h2 class="text-sm font-semibold text-gray-800 dark:text-white mb-3">
+                        ❓ 사용법
+                    </h2>
+                    
+                    <div class="space-y-2">
+                        <div>
+                            <h3 class="text-xs font-medium text-gray-800 dark:text-white mb-1">키보드 단축키</h3>
+                            <ul class="text-xs text-gray-600 dark:text-gray-400 space-y-1">
+                                <li>• Ctrl+Shift+A: 페이지 분석</li>
+                                <li>• Ctrl+Shift+H: 도움말</li>
+                            </ul>
+                        </div>
+                        
+                        <div class="p-2 bg-yellow-50 dark:bg-yellow-900/30 rounded">
+                            <p class="text-xs text-yellow-800 dark:text-yellow-200">
+                                💡 iframe 내 웹사이트를 분석해 맞춤 학습 도움을 제공합니다.
+                            </p>
+                        </div>
                     </div>
                 </div>
             </div>
-            
-            <button id="analyzePageBtn" class="w-full bg-primary-500 hover:bg-primary-600 text-white py-3 px-6 rounded-lg font-medium transition-colors">
-                📖 현재 페이지 분석하기
-            </button>
         </div>
 
-        <!-- 수동 질문 -->
-        <div class="glass-effect rounded-2xl p-6 mb-6 animate-slide-up" style="animation-delay: 0.1s;">
-            <h2 class="text-xl font-semibold text-gray-800 dark:text-white mb-4">
-                💬 직접 질문하기
-            </h2>
-            
-            <div class="flex flex-col space-y-4">
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                        분석 유형 선택
-                    </label>
-                    <select id="analysisType" class="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white">
-                        <option value="general">일반 학습 도움</option>
-                        <option value="definitions">용어 정의</option>
-                        <option value="references">참고자료 제안</option>
-                        <option value="quiz">퀴즈 생성</option>
-                        <option value="summary">내용 요약</option>
-                        <option value="code_explanation">코드 설명</option>
-                    </select>
-                </div>
-                
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                        분석할 텍스트 (선택사항)
-                    </label>
-                    <textarea id="customText" placeholder="분석하고 싶은 텍스트를 입력하세요. 비워두면 현재 페이지를 분석합니다."
-                        class="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white resize-none h-32"></textarea>
-                </div>
-                
-                <button id="customAnalyzeBtn" class="bg-green-500 hover:bg-green-600 text-white py-3 px-6 rounded-lg font-medium transition-colors">
-                    🎯 맞춤 분석 시작
-                </button>
+        <!-- Main Content Area (Browser) -->
+        <div class="main-content">
+            <!-- Navigation Bar -->
+            <div class="navigation-bar">
+                <button id="backBtn" class="nav-button" title="뒤로 가기">◀</button>
+                <button id="forwardBtn" class="nav-button" title="앞으로 가기">▶</button>
+                <button id="refreshBtn" class="nav-button" title="새로고침">🔄</button>
+                <input type="text" id="urlInput" class="url-input" placeholder="웹사이트 URL을 입력하세요... (예: https://wikipedia.org)" value="https://ko.wikipedia.org">
+                <button id="goBtn" class="nav-button" title="이동">Go</button>
+                <button id="homeBtn" class="nav-button" title="홈">🏠</button>
             </div>
-        </div>
 
-        <!-- 분석 결과 -->
-        <div id="analysisResults" class="hidden glass-effect rounded-2xl p-6 mb-6 animate-slide-up">
-            <h2 class="text-xl font-semibold text-gray-800 dark:text-white mb-4">
-                📋 분석 결과
-            </h2>
-            <div id="resultsContent" class="text-gray-700 dark:text-gray-300">
-                <!-- 결과가 여기에 표시됩니다 -->
-            </div>
-        </div>
-
-        <!-- 설정 -->
-        <div class="glass-effect rounded-2xl p-6 mb-6 animate-slide-up" style="animation-delay: 0.2s;">
-            <h2 class="text-xl font-semibold text-gray-800 dark:text-white mb-4">
-                ⚙️ 설정
-            </h2>
-            
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                        자동 분석
-                    </label>
-                    <label class="flex items-center">
-                        <input type="checkbox" id="autoAnalysis" checked class="mr-2 w-4 h-4 text-primary-500 border-gray-300 rounded focus:ring-primary-500">
-                        <span class="text-sm text-gray-600 dark:text-gray-400">페이지 변경 시 자동 분석</span>
-                    </label>
-                </div>
+            <!-- Browser Container -->
+            <div class="browser-container">
+                <iframe id="browserIframe" class="browser-iframe" src="https://ko.wikipedia.org" 
+                        sandbox="allow-same-origin allow-scripts allow-forms allow-navigation allow-top-navigation"
+                        title="Web Browser">
+                </iframe>
                 
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                        난이도
-                    </label>
-                    <select id="difficultyLevel" class="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm">
-                        <option value="easy">쉬움</option>
-                        <option value="medium" selected>보통</option>
-                        <option value="hard">어려움</option>
-                    </select>
+                <!-- Loading Overlay -->
+                <div id="iframeLoading" class="loading-overlay hidden">
+                    <div class="text-center">
+                        <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-500 mx-auto mb-4"></div>
+                        <p class="text-gray-800 dark:text-white text-sm">페이지 로딩 중...</p>
+                    </div>
                 </div>
-                
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                        알림 시간
-                    </label>
-                    <select id="notificationDuration" class="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm">
-                        <option value="15">15초</option>
-                        <option value="30" selected>30초</option>
-                        <option value="60">1분</option>
-                        <option value="0">수동 닫기</option>
-                    </select>
-                </div>
-            </div>
-        </div>
-
-        <!-- 도움말 -->
-        <div class="glass-effect rounded-2xl p-6 animate-slide-up" style="animation-delay: 0.3s;">
-            <h2 class="text-xl font-semibold text-gray-800 dark:text-white mb-4">
-                ❓ 사용 방법
-            </h2>
-            
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                    <h3 class="font-medium text-gray-800 dark:text-white mb-2">🔍 자동 분석</h3>
-                    <ul class="text-sm text-gray-600 dark:text-gray-400 space-y-1">
-                        <li>• Google Docs에서 논문 작성 시 참고문헌 제안</li>
-                        <li>• 코딩 튜토리얼에서 코드 설명 제공</li>
-                        <li>• 학습 자료의 핵심 용어 정의</li>
-                        <li>• 내용에 맞는 퀴즈 자동 생성</li>
-                    </ul>
-                </div>
-                
-                <div>
-                    <h3 class="font-medium text-gray-800 dark:text-white mb-2">💻 시스템 요구사항</h3>
-                    <ul class="text-sm text-gray-600 dark:text-gray-400 space-y-1">
-                        <li>• Chrome 127+ (Chrome Canary 권장)</li>
-                        <li>• chrome://flags에서 Gemini Nano 활성화</li>
-                        <li>• 약 22GB 저장공간 (모델 다운로드)</li>
-                        <li>• 안정적인 인터넷 연결 (최초 설정시)</li>
-                    </ul>
-                </div>
-            </div>
-            
-            <div class="mt-4 p-3 bg-yellow-50 dark:bg-yellow-900/30 rounded-lg">
-                <p class="text-sm text-yellow-800 dark:text-yellow-200">
-                    💡 <strong>팁:</strong> 모든 분석은 브라우저에서 로컬로 처리되어 개인정보가 안전하게 보호됩니다.
-                </p>
             </div>
         </div>
     </div>
@@ -256,8 +394,11 @@
 
     <!-- JavaScript 모듈 로드 -->
     <script src="js/gemini-api.js"></script>
+    <script src="js/browserless-fetcher.js"></script>
     <script src="js/content-analyzer.js"></script>
     <script src="js/study-assistant.js"></script>
+    <script src="js/iframe-manager.js"></script>
+    <script src="js/cross-frame-comm.js"></script>
     <script src="js/app.js"></script>
 </body>
 </html>

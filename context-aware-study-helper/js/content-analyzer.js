@@ -1,6 +1,6 @@
 /**
- * Context-Aware Study Helper - 콘텐츠 분석 모듈
- * 웹페이지의 콘텐츠를 추출하고 분석하여 학습 컨텍스트를 파악
+ * Context-Aware Study Helper - 콘텐츠 분석 모듈 (Enhanced)
+ * iframe에서 웹페이지의 콘텐츠를 추출하고 분석하여 학습 컨텍스트를 파악
  */
 
 class ContentAnalyzer {
@@ -9,12 +9,150 @@ class ContentAnalyzer {
         this.contentType = 'unknown';
         this.analysisHistory = [];
         this.maxHistorySize = 10;
+        this.crossFrameComm = null;
+        this.iframeManager = null;
+        this.browserlessFetcher = null;
+        this.lastAnalyzedUrl = '';
+        this.isIframeMode = true; // iframe 모드로 변경
+        this.preferBrowserless = true; // 브라우저리스 방식 우선 사용
     }
 
     /**
-     * 현재 페이지의 콘텐츠를 추출
+     * iframe 모드 초기화
      */
-    extractPageContent() {
+    initializeIframeMode() {
+        // 모든 모듈 참조 설정
+        this.crossFrameComm = window.crossFrameComm;
+        this.iframeManager = window.iframeManager;
+        this.browserlessFetcher = window.browserlessFetcher;
+        
+        if (!this.crossFrameComm || !this.iframeManager) {
+            console.warn('iframe 통신 모듈이 초기화되지 않았습니다.');
+            this.isIframeMode = false;
+        }
+        
+        if (!this.browserlessFetcher) {
+            console.warn('브라우저리스 페처가 초기화되지 않았습니다.');
+            this.preferBrowserless = false;
+        }
+    }
+
+    /**
+     * 현재 페이지의 콘텐츠를 추출 (iframe 모드)
+     */
+    async extractPageContent() {
+        try {
+            if (this.isIframeMode && this.crossFrameComm) {
+                // iframe에서 콘텐츠 추출
+                return await this.extractIframeContent();
+            } else {
+                // 기존 방식으로 현재 페이지에서 추출
+                return this.extractCurrentPageContent();
+            }
+        } catch (error) {
+            console.error('콘텐츠 추출 오류:', error);
+            return {
+                content: '',
+                contentType: 'error',
+                length: 0,
+                wordCount: 0,
+                error: error.message
+            };
+        }
+    }
+
+    /**
+     * iframe에서 콘텐츠 추출 (브라우저리스 방식 우선)
+     */
+    async extractIframeContent() {
+        const currentUrl = this.iframeManager?.getCurrentUrl() || '';
+        
+        try {
+            // 1. 브라우저리스 방식 먼저 시도 (더 안정적)
+            if (this.preferBrowserless && this.browserlessFetcher && currentUrl) {
+                console.log('브라우저리스 방식으로 콘텐츠 추출 시도:', currentUrl);
+                
+                const browserlessResult = await this.browserlessFetcher.fetchContent(currentUrl);
+                
+                if (browserlessResult.success) {
+                    console.log('브라우저리스 추출 성공:', browserlessResult.method);
+                    
+                    this.currentContent = browserlessResult.content || '';
+                    this.contentType = browserlessResult.contentType || this.detectContentType(this.currentContent);
+                    this.lastAnalyzedUrl = browserlessResult.url || '';
+                    
+                    return {
+                        content: this.currentContent,
+                        contentType: this.contentType,
+                        length: this.currentContent.length,
+                        wordCount: browserlessResult.wordCount || this.currentContent.split(/\s+/).length,
+                        title: browserlessResult.title || '',
+                        url: browserlessResult.url || currentUrl,
+                        extractionMethod: `browserless_${browserlessResult.method}`,
+                        extractedAt: browserlessResult.extractedAt || new Date().toISOString()
+                    };
+                } else {
+                    console.log('브라우저리스 추출 실패, iframe 방식으로 대체:', browserlessResult.error);
+                }
+            }
+            
+            // 2. 기존 iframe 방식으로 시도
+            const result = await this.crossFrameComm.extractContentFromIframe();
+            
+            if (result.success) {
+                // 성공적으로 추출된 경우
+                this.currentContent = result.content || '';
+                this.contentType = result.contentType || this.detectContentType(this.currentContent);
+                this.lastAnalyzedUrl = result.url || '';
+                
+                return {
+                    content: this.currentContent,
+                    contentType: this.contentType,
+                    length: this.currentContent.length,
+                    wordCount: result.wordCount || this.currentContent.split(/\s+/).length,
+                    title: result.title || '',
+                    url: result.url || '',
+                    extractionMethod: result.method || 'iframe',
+                    extractedAt: result.extractedAt || new Date().toISOString()
+                };
+            } else {
+                // 모든 방법 실패 시 최종 대안 제시
+                return {
+                    content: '',
+                    contentType: 'blocked',
+                    length: 0,
+                    wordCount: 0,
+                    error: 'all_methods_failed',
+                    message: '모든 콘텐츠 추출 방법이 실패했습니다.',
+                    fallbackMethods: [
+                        '북마클릿 사용 (가장 안정적)',
+                        '새 탭에서 열어서 텍스트 복사',
+                        '콘텐츠를 직접 입력하여 맞춤 분석'
+                    ],
+                    url: currentUrl
+                };
+            }
+            
+        } catch (error) {
+            console.error('콘텐츠 추출 오류:', error);
+            return {
+                content: '',
+                contentType: 'error',
+                length: 0,
+                wordCount: 0,
+                error: error.message,
+                fallbackMethods: [
+                    '북마클릿 사용',
+                    '수동 텍스트 입력'
+                ]
+            };
+        }
+    }
+
+    /**
+     * 현재 페이지에서 콘텐츠 추출 (기존 방식)
+     */
+    extractCurrentPageContent() {
         try {
             // 기본 텍스트 콘텐츠 추출
             let content = document.body.innerText || document.body.textContent || '';
@@ -37,11 +175,13 @@ class ContentAnalyzer {
                 content: content,
                 contentType: this.contentType,
                 length: content.length,
-                wordCount: content.split(/\s+/).length
+                wordCount: content.split(/\s+/).length,
+                url: window.location.href,
+                title: document.title
             };
 
         } catch (error) {
-            console.error('콘텐츠 추출 오류:', error);
+            console.error('현재 페이지 콘텐츠 추출 오류:', error);
             return {
                 content: '',
                 contentType: 'error',
@@ -133,11 +273,17 @@ class ContentAnalyzer {
     }
 
     /**
-     * 콘텐츠 유형 감지
+     * 콘텐츠 유형 감지 (Enhanced for iframe)
      */
-    detectContentType(content) {
-        const url = window.location.href.toLowerCase();
-        const title = document.title.toLowerCase();
+    detectContentType(content, url = null, title = null) {
+        // iframe 모드인 경우 iframe URL 사용
+        if (this.isIframeMode && this.iframeManager) {
+            url = url || this.iframeManager.getCurrentUrl().toLowerCase();
+            title = title || ''; // iframe에서 title 추출이 어려울 수 있음
+        } else {
+            url = url || window.location.href.toLowerCase();
+            title = title || document.title.toLowerCase();
+        }
         
         // URL 기반 감지
         if (url.includes('docs.google.com')) {
@@ -182,12 +328,45 @@ class ContentAnalyzer {
     }
 
     /**
-     * 컨텍스트에 맞는 콘텐츠 추출
+     * 추출 오류 처리
      */
-    extractContextualContent() {
-        const baseContent = this.extractPageContent();
+    handleExtractionError(baseContent) {
+        // 안전한 기본값 설정
+        const safeBaseContent = {
+            content: '',
+            contentType: 'error',
+            length: 0,
+            wordCount: 0,
+            title: '',
+            url: '',
+            error: '콘텐츠 추출 실패',
+            ...baseContent
+        };
         
-        switch (this.contentType) {
+        return {
+            ...safeBaseContent,
+            suggestions: [
+                '이 사이트는 iframe 분석이 제한되어 있습니다.',
+                '새 탭에서 사이트를 열어 직접 분석해보세요.',
+                '텍스트를 직접 복사하여 맞춤 분석을 이용해보세요.',
+                ...(baseContent?.fallbackMethods || [])
+            ],
+            isBlocked: true
+        };
+    }
+
+    /**
+     * 컨텍스트에 맞는 콘텐츠 추출 (Enhanced for iframe)
+     */
+    async extractContextualContent() {
+        const baseContent = await this.extractPageContent();
+        
+        // 추출 실패시 적절한 대응
+        if (baseContent.error) {
+            return this.handleExtractionError(baseContent);
+        }
+        
+        switch (baseContent.contentType) {
             case 'google_docs':
                 const docsContent = this.extractGoogleDocsContent();
                 return {
@@ -345,7 +524,115 @@ class ContentAnalyzer {
             this.domObserver.disconnect();
         }
     }
+
+    /**
+     * URL 변경 감지 및 컨텍스트 업데이트 (iframe 모드용)
+     */
+    onIframeUrlChange(newUrl) {
+        if (this.lastAnalyzedUrl !== newUrl) {
+            this.lastAnalyzedUrl = newUrl;
+            console.log('iframe URL 변경 감지:', newUrl);
+            
+            // Study Assistant에 알림 (자동 분석이 활성화된 경우)
+            if (window.studyAssistant && document.getElementById('autoAnalysis')?.checked) {
+                setTimeout(() => {
+                    window.studyAssistant.analyzeCurrentPage();
+                }, 2000); // 페이지 로드 대기
+            }
+        }
+    }
+
+    /**
+     * 실시간 iframe 콘텐츠 모니터링
+     */
+    startIframeMonitoring() {
+        if (!this.isIframeMode || !this.iframeManager) return;
+        
+        // URL 변경 감지
+        let lastUrl = '';
+        const checkUrlChange = () => {
+            const currentUrl = this.iframeManager.getCurrentUrl();
+            if (currentUrl !== lastUrl && currentUrl) {
+                lastUrl = currentUrl;
+                this.onIframeUrlChange(currentUrl);
+            }
+        };
+        
+        // 주기적으로 URL 체크
+        setInterval(checkUrlChange, 2000);
+    }
+
+    /**
+     * 북마클릿 스크립트 생성
+     */
+    generateBookmarkletScript() {
+        return `
+            javascript:(function(){
+                // Study Helper 북마클릿
+                if(window.studyHelperBookmarklet) return;
+                window.studyHelperBookmarklet = true;
+                
+                const script = document.createElement('script');
+                script.onload = function() {
+                    if(window.StudyHelperBookmarklet) {
+                        new StudyHelperBookmarklet().init();
+                    }
+                };
+                script.src = '${window.location.origin}/js/bookmarklet.js';
+                document.head.appendChild(script);
+            })();
+        `;
+    }
+
+    /**
+     * iframe 접근성 확인
+     */
+    checkIframeAccessibility() {
+        if (!this.isIframeMode || !this.iframeManager) return false;
+        
+        try {
+            const iframe = this.iframeManager.getIframe();
+            const doc = iframe.contentDocument || iframe.contentWindow.document;
+            return doc !== null;
+        } catch (error) {
+            return false;
+        }
+    }
+
+    /**
+     * 분석 가능 사이트 목록
+     */
+    getSupportedSites() {
+        return [
+            { name: 'Wikipedia', url: 'https://ko.wikipedia.org', description: '백과사전 - 용어 정의에 최적화' },
+            { name: 'MDN Web Docs', url: 'https://developer.mozilla.org', description: '웹 개발 문서 - 코드 설명에 최적화' },
+            { name: 'W3Schools', url: 'https://www.w3schools.com', description: '프로그래밍 튜토리얼 - 학습 퀴즈에 최적화' },
+            { name: 'Khan Academy', url: 'https://www.khanacademy.org', description: '교육 콘텐츠 - 내용 요약에 최적화' },
+            { name: 'Stack Overflow', url: 'https://stackoverflow.com', description: '프로그래밍 Q&A - 문제 해결에 최적화' }
+        ];
+    }
+
+    /**
+     * 정리 및 종료
+     */
+    destroy() {
+        this.stopPageMonitoring();
+        this.crossFrameComm = null;
+        this.iframeManager = null;
+        console.log('ContentAnalyzer (Enhanced) 정리 완료');
+    }
 }
 
 // 전역 인스턴스 생성
 window.contentAnalyzer = new ContentAnalyzer();
+
+// iframe 모드 초기화는 다른 모듈들이 로드된 후에 실행
+document.addEventListener('DOMContentLoaded', () => {
+    // 다른 모듈들이 로드될 때까지 약간 대기
+    setTimeout(() => {
+        if (window.contentAnalyzer) {
+            window.contentAnalyzer.initializeIframeMode();
+            window.contentAnalyzer.startIframeMonitoring();
+        }
+    }, 1000);
+});

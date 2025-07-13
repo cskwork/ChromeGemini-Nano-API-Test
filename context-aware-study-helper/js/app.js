@@ -1,6 +1,6 @@
 /**
- * Context-Aware Study Helper - 메인 애플리케이션 로직
- * 사용자 인터페이스와 AI 모듈들을 연결하는 중앙 컨트롤러
+ * Context-Aware Study Helper - 메인 애플리케이션 로직 (Enhanced)
+ * 사용자 인터페이스와 AI 모듈들을 연결하는 중앙 컨트롤러 (iframe 지원)
  */
 
 class StudyHelperApp {
@@ -8,6 +8,8 @@ class StudyHelperApp {
         this.geminiAPI = window.geminiAPI;
         this.contentAnalyzer = window.contentAnalyzer;
         this.studyAssistant = window.studyAssistant;
+        this.iframeManager = null;
+        this.crossFrameComm = null;
         this.isDarkMode = localStorage.getItem('darkMode') === 'true';
         this.isInitialized = false;
         
@@ -15,12 +17,15 @@ class StudyHelperApp {
     }
 
     /**
-     * 애플리케이션 초기화
+     * 애플리케이션 초기화 (Enhanced for iframe)
      */
     async initializeApp() {
         try {
             // 다크모드 설정 적용
             this.applyDarkMode();
+            
+            // iframe 관련 모듈 참조 설정
+            this.setupIframeReferences();
             
             // 이벤트 리스너 설정
             this.setupEventListeners();
@@ -28,7 +33,7 @@ class StudyHelperApp {
             // API 상태 확인
             await this.checkAPIStatus();
             
-            // 페이지 정보 업데이트
+            // 페이지 정보 업데이트 (iframe 기반)
             this.updatePageInfo();
             
             // Study Assistant 초기화 (자동 분석 설정이 켜져있으면)
@@ -38,11 +43,34 @@ class StudyHelperApp {
             }
             
             this.isInitialized = true;
-            this.showToast('초기화 완료', 'Context-Aware Study Helper가 준비되었습니다.', 'success');
+            this.showToast('초기화 완료', 'Enhanced Study Helper가 준비되었습니다.', 'success');
             
         } catch (error) {
             console.error('앱 초기화 오류:', error);
             this.showToast('초기화 실패', error.message, 'error');
+        }
+    }
+
+    /**
+     * iframe 모듈 참조 설정
+     */
+    setupIframeReferences() {
+        // 다른 모듈들이 로드될 때까지 대기 후 참조 설정
+        const setupRefs = () => {
+            this.iframeManager = window.iframeManager;
+            this.crossFrameComm = window.crossFrameComm;
+            
+            if (!this.iframeManager || !this.crossFrameComm) {
+                console.warn('iframe 모듈들이 아직 로드되지 않았습니다.');
+                return false;
+            }
+            return true;
+        };
+        
+        // 즉시 시도
+        if (!setupRefs()) {
+            // 실패시 500ms 후 재시도
+            setTimeout(setupRefs, 500);
         }
     }
 
@@ -146,40 +174,92 @@ class StudyHelperApp {
     }
 
     /**
-     * 현재 페이지 정보 업데이트
+     * 현재 페이지 정보 업데이트 (iframe 기반)
      */
-    updatePageInfo() {
+    async updatePageInfo() {
         const pageInfo = document.getElementById('pageInfo');
         const contentType = document.getElementById('contentType');
         
         try {
-            // 페이지 기본 정보
-            const url = window.location.href;
-            const title = document.title;
-            
-            pageInfo.innerHTML = `
-                <div class="mb-1"><strong>제목:</strong> ${title || '제목 없음'}</div>
-                <div class="text-xs text-blue-500 truncate">${url}</div>
-            `;
-            
-            // 콘텐츠 분석
-            const content = this.contentAnalyzer.extractPageContent();
-            const typeLabel = this.getContentTypeLabel(content.contentType);
-            
-            contentType.innerHTML = `
-                <div class="mb-1"><strong>타입:</strong> ${typeLabel}</div>
-                <div class="text-xs">단어 수: ${content.wordCount.toLocaleString()}개</div>
-            `;
+            if (this.iframeManager) {
+                // iframe URL 사용
+                const url = this.iframeManager.getCurrentUrl() || 'about:blank';
+                const urlDisplay = url.length > 50 ? url.substring(0, 50) + '...' : url;
+                
+                pageInfo.innerHTML = `
+                    <div class="mb-1"><strong>URL:</strong></div>
+                    <div class="text-xs text-blue-500 break-all">${urlDisplay}</div>
+                `;
+                
+                // iframe 콘텐츠 분석
+                try {
+                    const content = await this.contentAnalyzer.extractPageContent();
+                    const typeLabel = this.getContentTypeLabel(content.contentType);
+                    
+                    if (content.error) {
+                        contentType.innerHTML = `
+                            <div class="mb-1"><strong>상태:</strong> <span class="text-red-500">분석 제한</span></div>
+                            <div class="text-xs">iframe 접근 차단됨</div>
+                        `;
+                    } else {
+                        contentType.innerHTML = `
+                            <div class="mb-1"><strong>타입:</strong> ${typeLabel}</div>
+                            <div class="text-xs">단어 수: ${content.wordCount?.toLocaleString() || 0}개</div>
+                        `;
+                    }
+                } catch (extractError) {
+                    contentType.innerHTML = `
+                        <div class="mb-1"><strong>상태:</strong> <span class="text-yellow-500">분석 대기</span></div>
+                        <div class="text-xs">콘텐츠 로딩 중...</div>
+                    `;
+                }
+            } else {
+                // iframe 관리자가 없는 경우 기본값
+                pageInfo.innerHTML = `
+                    <div class="text-xs text-gray-500">iframe 로딩 중...</div>
+                `;
+                contentType.innerHTML = `
+                    <div class="text-xs text-gray-500">분석 준비 중...</div>
+                `;
+            }
             
         } catch (error) {
             console.error('페이지 정보 업데이트 오류:', error);
-            pageInfo.textContent = '페이지 정보를 불러올 수 없습니다.';
-            contentType.textContent = '분석 실패';
+            pageInfo.innerHTML = '<div class="text-xs text-red-500">정보 로드 실패</div>';
+            contentType.innerHTML = '<div class="text-xs text-red-500">분석 실패</div>';
         }
     }
 
     /**
-     * 현재 페이지 분석
+     * iframe 페이지 변경 이벤트 처리
+     */
+    onIframePageChange(newUrl) {
+        console.log('App: iframe 페이지 변경 감지:', newUrl);
+        
+        // 페이지 정보 업데이트
+        this.updatePageInfo();
+        
+        // 자동 분석이 활성화된 경우 분석 수행
+        const autoAnalysis = document.getElementById('autoAnalysis')?.checked;
+        if (autoAnalysis) {
+            setTimeout(() => {
+                this.analyzeCurrentPage();
+            }, 3000); // 페이지 로드 완료 대기
+        }
+    }
+
+    /**
+     * 콘텐츠 추출 완료 이벤트 처리
+     */
+    onContentExtracted(data) {
+        console.log('App: 콘텐츠 추출 완료:', data);
+        
+        // 페이지 정보 즉시 업데이트
+        this.updatePageInfo();
+    }
+
+    /**
+     * 현재 페이지 분석 (Enhanced for iframe)
      */
     async analyzeCurrentPage() {
         if (!await this.checkAPIStatus()) {
@@ -195,10 +275,17 @@ class StudyHelperApp {
                 await this.geminiAPI.createSession();
             }
 
-            // 콘텐츠 추출
-            const contentData = this.contentAnalyzer.extractContextualContent();
+            // iframe에서 콘텐츠 추출 (비동기)
+            const contentData = await this.contentAnalyzer.extractContextualContent();
             
-            if (contentData.content.length < 50) {
+            // 콘텐츠 추출 실패 처리
+            if (contentData.error || contentData.isBlocked) {
+                this.handleBlockedContent(contentData);
+                this.showLoading(false);
+                return;
+            }
+            
+            if (!contentData.content || contentData.content.length < 50) {
                 this.showToast('분석 불가', '분석할 수 있는 콘텐츠가 충분하지 않습니다.', 'warning');
                 this.showLoading(false);
                 return;
@@ -213,14 +300,120 @@ class StudyHelperApp {
             // 결과 표시
             this.displayAnalysisResult(result, contentData);
             
-            this.showToast('분석 완료', '페이지 분석이 완료되었습니다.', 'success');
+            this.showToast('분석 완료', 'iframe 페이지 분석이 완료되었습니다.', 'success');
             
         } catch (error) {
-            console.error('페이지 분석 오류:', error);
+            console.error('iframe 페이지 분석 오류:', error);
             this.showToast('분석 실패', error.message, 'error');
         } finally {
             this.showLoading(false);
         }
+    }
+
+    /**
+     * 차단된 콘텐츠 처리
+     */
+    handleBlockedContent(contentData) {
+        const resultsContainer = document.getElementById('analysisResults');
+        const resultsContent = document.getElementById('resultsContent');
+        
+        const currentUrl = this.iframeManager?.getCurrentUrl() || '';
+        const siteName = this.extractSiteName(currentUrl);
+        
+        resultsContent.innerHTML = `
+            <div class="p-4 bg-yellow-50 dark:bg-yellow-900/30 rounded-lg border border-yellow-200 dark:border-yellow-700">
+                <h3 class="text-yellow-800 dark:text-yellow-200 font-medium mb-3 flex items-center">
+                    🚫 ${siteName} 분석 제한
+                </h3>
+                <p class="text-yellow-700 dark:text-yellow-300 text-sm mb-4">
+                    이 사이트는 보안상의 이유로 iframe 내에서의 콘텐츠 분석을 차단했습니다.
+                </p>
+                
+                <div class="space-y-3">
+                    <h4 class="text-yellow-800 dark:text-yellow-200 font-medium text-sm">💡 대안 방법:</h4>
+                    <ul class="text-yellow-700 dark:text-yellow-300 text-sm space-y-2">
+                        <li>• <button onclick="window.open('${currentUrl}', '_blank')" class="text-blue-600 dark:text-blue-400 underline hover:no-underline">새 탭에서 사이트 열기</button></li>
+                        <li>• 텍스트를 복사하여 아래 "맞춤 분석"에 붙여넣기</li>
+                        ${this.generateEducationalSiteSuggestions()}
+                    </ul>
+                </div>
+                
+                <div class="mt-4 p-3 bg-white dark:bg-gray-800 rounded border">
+                    <h5 class="text-sm font-medium text-gray-800 dark:text-white mb-2">📚 추천 교육 사이트:</h5>
+                    <div class="grid grid-cols-1 gap-2">
+                        ${this.generateQuickAccessButtons()}
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        resultsContainer.classList.remove('hidden');
+        resultsContainer.scrollIntoView({ behavior: 'smooth' });
+        
+        this.showToast('분석 제한', `${siteName}에서 콘텐츠 분석이 차단되었습니다.`, 'warning');
+    }
+
+    /**
+     * 사이트명 추출
+     */
+    extractSiteName(url) {
+        try {
+            const urlObj = new URL(url);
+            const hostname = urlObj.hostname;
+            
+            // 일반적인 사이트명 매핑
+            const siteNames = {
+                'google.com': 'Google',
+                'youtube.com': 'YouTube',
+                'facebook.com': 'Facebook',
+                'twitter.com': 'Twitter',
+                'instagram.com': 'Instagram',
+                'linkedin.com': 'LinkedIn',
+                'github.com': 'GitHub',
+                'stackoverflow.com': 'Stack Overflow'
+            };
+            
+            for (const [domain, name] of Object.entries(siteNames)) {
+                if (hostname.includes(domain)) {
+                    return name;
+                }
+            }
+            
+            // 도메인에서 사이트명 추출
+            const parts = hostname.split('.');
+            return parts.length > 1 ? parts[parts.length - 2] : hostname;
+            
+        } catch (error) {
+            return '사이트';
+        }
+    }
+
+    /**
+     * 교육 사이트 제안 생성
+     */
+    generateEducationalSiteSuggestions() {
+        const suggestions = this.contentAnalyzer?.getSupportedSites() || [];
+        if (suggestions.length === 0) return '';
+        
+        return '<li>• 분석 가능한 교육 사이트로 이동하기 (아래 추천 사이트 참조)</li>';
+    }
+
+    /**
+     * 빠른 접근 버튼 생성
+     */
+    generateQuickAccessButtons() {
+        const sites = this.contentAnalyzer?.getSupportedSites() || [
+            { name: 'Wikipedia', url: 'https://ko.wikipedia.org', description: '백과사전' },
+            { name: 'MDN Docs', url: 'https://developer.mozilla.org', description: '웹 개발 문서' }
+        ];
+        
+        return sites.map(site => `
+            <button onclick="window.iframeManager?.loadUrl('${site.url}')" 
+                    class="text-left p-2 bg-blue-50 dark:bg-blue-900/30 hover:bg-blue-100 dark:hover:bg-blue-900/50 rounded border text-sm transition-colors">
+                <div class="font-medium text-blue-800 dark:text-blue-200">${site.name}</div>
+                <div class="text-blue-600 dark:text-blue-300 text-xs">${site.description}</div>
+            </button>
+        `).join('');
     }
 
     /**
@@ -248,8 +441,8 @@ class StudyHelperApp {
             if (customText) {
                 textToAnalyze = customText;
             } else {
-                const contentData = this.contentAnalyzer.extractPageContent();
-                textToAnalyze = contentData.content;
+                const contentData = await this.contentAnalyzer.extractPageContent();
+                textToAnalyze = contentData.content || '';
             }
             
             if (textToAnalyze.length < 10) {
@@ -743,6 +936,24 @@ class StudyHelperApp {
             this.showToast('단축키', 'Ctrl+Shift+A: 페이지 분석, Ctrl+Shift+H: 이 도움말', 'info');
         }
     }
+
+
+    /**
+     * iframe URL 변경 감지 콜백 (iframe 모드용)
+     */
+    onIframePageChange(newUrl) {
+        console.log('iframe 페이지 변경:', newUrl);
+        this.updatePageInfo();
+        
+        // Study Assistant에 알림
+        if (this.studyAssistant && document.getElementById('autoAnalysis')?.checked) {
+            // 페이지 로드 완료를 기다린 후 자동 분석
+            setTimeout(() => {
+                this.studyAssistant.analyzeCurrentPage();
+            }, 2000);
+        }
+    }
+
 }
 
 // DOM이 로드되면 앱 시작

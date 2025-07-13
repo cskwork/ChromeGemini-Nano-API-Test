@@ -71,10 +71,17 @@ class StudyAssistant {
      */
     async analyzeCurrentPage() {
         try {
-            // 콘텐츠 추출 및 분석
-            const contentData = this.contentAnalyzer.extractContextualContent();
+            // 콘텐츠 추출 및 분석 (await 추가)
+            const contentData = await this.contentAnalyzer.extractContextualContent();
+            
+            // 콘텐츠 존재 여부 및 유효성 검증
+            if (!contentData || !contentData.content || typeof contentData.content !== 'string') {
+                console.warn('콘텐츠 데이터가 유효하지 않음:', contentData);
+                return;
+            }
             
             if (contentData.content.length < 50) {
+                console.log('콘텐츠가 너무 적음 (< 50자):', contentData.content.length);
                 return; // 콘텐츠가 너무 적으면 분석하지 않음
             }
 
