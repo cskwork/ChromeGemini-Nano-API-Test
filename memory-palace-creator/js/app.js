@@ -44,9 +44,9 @@ class MemoryPalaceCreator {
                     this.updateAPIStatus('available', 'Gemini Nano API 사용 가능');
                     break;
                 case 'downloadable':
-                    this.updateAPIStatus('downloadable', 'Gemini Nano 모델 다운로드가 필요합니다. 잠시 기다려주세요...');
-                    // 다운로드 상태 주기적으로 확인
-                    this.checkDownloadProgress();
+                    this.updateAPIStatus('downloadable', 'Gemini Nano 모델(약 1.7GB) 다운로드를 시작합니다...');
+                    // 즉시 다운로드 시작
+                    await this.triggerModelDownload();
                     break;
                 case 'downloading':
                     this.updateAPIStatus('downloading', 'Gemini Nano 모델을 다운로드하는 중입니다...');
@@ -106,16 +106,127 @@ class MemoryPalaceCreator {
         generateBtn.disabled = status !== 'available';
     }
 
-    async checkDownloadProgress() {
-        const checkInterval = setInterval(async () => {
-            const availability = await LanguageModel.availability();
-            if (availability === 'available') {
-                clearInterval(checkInterval);
-                this.updateAPIStatus('available', 'Gemini Nano API 사용 가능');
-            } else if (availability === 'downloading') {
-                this.updateAPIStatus('downloading', 'Gemini Nano 모델을 다운로드하는 중입니다...');
+    async triggerModelDownload() {
+        try {
+            // 사용자에게 다운로드 안내
+            this.showDownloadNotice();
+            
+            // 세션 생성을 시도하여 다운로드 트리거
+            console.log('모델 다운로드 시작 중...');
+            const session = await LanguageModel.create();
+            
+            // 세션이 성공적으로 생성되면 다운로드가 시작됨
+            if (session) {
+                this.session = session;
+                this.updateAPIStatus('downloading', 'Gemini Nano 모델 다운로드 중... (약 1.7GB)');
+                this.checkDownloadProgress();
             }
-        }, 3000);
+        } catch (error) {
+            console.log('다운로드 트리거 오류 (정상적일 수 있음):', error);
+            // 다운로드가 시작된 경우 에러가 발생할 수 있으므로 진행 상황 확인
+            this.checkDownloadProgress();
+        }
+    }
+
+    showDownloadNotice() {
+        const notification = document.createElement('div');
+        notification.className = 'fixed top-4 left-1/2 transform -translate-x-1/2 bg-blue-600 text-white px-6 py-4 rounded-lg shadow-lg z-50 max-w-md';
+        notification.innerHTML = `
+            <div class="flex items-center space-x-3">
+                <svg class="w-6 h-6 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                </svg>
+                <div>
+                    <p class="font-medium">Gemini Nano 모델 다운로드</p>
+                    <p class="text-sm opacity-90">약 1.7GB 크기 • 시간이 오래 걸릴 수 있습니다</p>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(notification);
+        
+        // 10초 후 자동 제거
+        setTimeout(() => {
+            if (notification.parentNode) {
+                notification.remove();
+            }
+        }, 10000);
+    }
+
+    async checkDownloadProgress() {
+        let retryCount = 0;
+        const maxRetries = 3;
+        const checkInterval = 2000; // 2초마다 확인
+        let noProgressCount = 0;
+        const maxNoProgress = 30; // 60초 동안 진행이 없으면 재시도
+        
+        const progressChecker = setInterval(async () => {
+            try {
+                const availability = await LanguageModel.availability();
+                console.log(`다운로드 상태 확인: ${availability}`);
+                
+                if (availability === 'available') {
+                    clearInterval(progressChecker);
+                    this.updateAPIStatus('available', 'Gemini Nano API 사용 가능! 🎉');
+                    this.showSuccessNotification();
+                } else if (availability === 'downloading') {
+                    this.updateAPIStatus('downloading', `Gemini Nano 모델 다운로드 중... (약 1.7GB)`);
+                    noProgressCount = 0; // 진행 중이므로 카운터 리셋
+                } else if (availability === 'downloadable') {
+                    noProgressCount++;
+                    if (noProgressCount >= maxNoProgress && retryCount < maxRetries) {
+                        console.log(`다운로드 재시도 ${retryCount + 1}/${maxRetries}`);
+                        retryCount++;
+                        noProgressCount = 0;
+                        await this.triggerModelDownload();
+                    } else if (retryCount >= maxRetries) {
+                        clearInterval(progressChecker);
+                        this.updateAPIStatus('error', '다운로드가 시작되지 않습니다. 페이지를 새로고침해 주세요.');
+                    }
+                } else {
+                    // 예상치 못한 상태
+                    noProgressCount++;
+                    if (noProgressCount >= maxNoProgress) {
+                        clearInterval(progressChecker);
+                        this.updateAPIStatus('error', `예상치 못한 상태: ${availability}`);
+                    }
+                }
+            } catch (error) {
+                console.error('다운로드 진행 상황 확인 오류:', error);
+                retryCount++;
+                if (retryCount >= maxRetries) {
+                    clearInterval(progressChecker);
+                    this.updateAPIStatus('error', '다운로드 상태 확인 중 오류가 발생했습니다.');
+                }
+            }
+        }, checkInterval);
+        
+        // 타임아웃 설정 (30분)
+        setTimeout(() => {
+            clearInterval(progressChecker);
+            if (document.getElementById('apiStatus').textContent.includes('다운로드')) {
+                this.updateAPIStatus('error', '다운로드 시간이 초과되었습니다. 네트워크 연결을 확인하고 새로고침해 주세요.');
+            }
+        }, 30 * 60 * 1000);
+    }
+    
+    showSuccessNotification() {
+        const notification = document.createElement('div');
+        notification.className = 'fixed top-4 left-1/2 transform -translate-x-1/2 bg-green-600 text-white px-6 py-4 rounded-lg shadow-lg z-50';
+        notification.innerHTML = `
+            <div class="flex items-center space-x-3">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                </svg>
+                <p class="font-medium">Gemini Nano 모델 다운로드 완료!</p>
+            </div>
+        `;
+        document.body.appendChild(notification);
+        
+        setTimeout(() => {
+            if (notification.parentNode) {
+                notification.remove();
+            }
+        }, 5000);
     }
 
     setupEventListeners() {
