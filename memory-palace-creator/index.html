@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Memory Palace Creator - AI 기반 기억의 궁전 생성기</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="css/styles.css">
+    <script>
+        // Tailwind 커스텀 설정
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    animation: {
+                        'fade-in': 'fadeIn 0.5s ease-in-out',
+                        'slide-up': 'slideUp 0.3s ease-out'
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-gray-50 dark:bg-gray-900 transition-colors duration-200">
+    <!-- 헤더 -->
+    <header class="bg-white dark:bg-gray-800 shadow-sm border-b border-gray-200 dark:border-gray-700">
+        <div class="container mx-auto px-4 py-4">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center space-x-3">
+                    <div class="w-10 h-10 bg-gradient-to-br from-purple-600 to-pink-600 rounded-lg flex items-center justify-center">
+                        <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path>
+                        </svg>
+                    </div>
+                    <h1 class="text-2xl font-bold text-gray-900 dark:text-white">Memory Palace Creator</h1>
+                </div>
+                <button id="darkModeToggle" class="p-2 rounded-lg bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors">
+                    <svg class="w-6 h-6 text-gray-700 dark:text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"></path>
+                    </svg>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- API 상태 표시 -->
+    <div id="apiStatus" class="container mx-auto px-4 mt-4">
+        <div class="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4">
+            <div class="flex items-center space-x-2">
+                <svg class="w-5 h-5 text-yellow-600 dark:text-yellow-500" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"></path>
+                </svg>
+                <span class="text-yellow-800 dark:text-yellow-300">Gemini Nano API 상태 확인 중...</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- 메인 컨텐츠 -->
+    <main class="container mx-auto px-4 py-8">
+        <div class="grid lg:grid-cols-2 gap-8">
+            <!-- 왼쪽: 입력 폼 -->
+            <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+                <h2 class="text-xl font-semibold text-gray-900 dark:text-white mb-6">기억할 항목 입력</h2>
+                
+                <!-- 테마 선택 -->
+                <div class="mb-6">
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        기억의 궁전 테마
+                    </label>
+                    <select id="themeSelect" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500 focus:border-transparent">
+                        <option value="fantasy-castle">🏰 판타지 성</option>
+                        <option value="spaceship">🚀 우주선</option>
+                        <option value="magic-school">🎓 마법 학교</option>
+                        <option value="strange-house">🏚️ 기묘한 집</option>
+                        <option value="underwater-palace">🏊 해저 궁전</option>
+                        <option value="time-machine">⏰ 시간여행 기계</option>
+                    </select>
+                </div>
+
+                <!-- 메모리 아이템 리스트 -->
+                <div class="mb-4">
+                    <div class="flex items-center justify-between mb-3">
+                        <label class="text-sm font-medium text-gray-700 dark:text-gray-300">
+                            기억할 항목들
+                        </label>
+                        <button id="addItemBtn" class="text-sm text-purple-600 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300 font-medium">
+                            + 항목 추가
+                        </button>
+                    </div>
+                    <div id="memoryItems" class="space-y-3">
+                        <!-- 동적으로 항목이 추가됨 -->
+                    </div>
+                </div>
+
+                <!-- 예시 템플릿 -->
+                <div class="mb-6 p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
+                    <p class="text-sm text-gray-600 dark:text-gray-400 mb-2">💡 예시 항목들:</p>
+                    <div class="flex flex-wrap gap-2">
+                        <button class="example-btn text-xs px-3 py-1 bg-white dark:bg-gray-600 border border-gray-300 dark:border-gray-500 rounded-full hover:bg-gray-100 dark:hover:bg-gray-500 text-gray-700 dark:text-gray-300" data-category="date" data-content="1492년 - 콜럼버스 아메리카 발견">
+                            📅 1492년
+                        </button>
+                        <button class="example-btn text-xs px-3 py-1 bg-white dark:bg-gray-600 border border-gray-300 dark:border-gray-500 rounded-full hover:bg-gray-100 dark:hover:bg-gray-500 text-gray-700 dark:text-gray-300" data-category="formula" data-content="E=mc² - 질량-에너지 등가원리">
+                            🔬 E=mc²
+                        </button>
+                        <button class="example-btn text-xs px-3 py-1 bg-white dark:bg-gray-600 border border-gray-300 dark:border-gray-500 rounded-full hover:bg-gray-100 dark:hover:bg-gray-500 text-gray-700 dark:text-gray-300" data-category="vocab" data-content="Serendipity - 우연한 행운">
+                            📚 Serendipity
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 생성 버튼 -->
+                <button id="generateBtn" class="w-full bg-gradient-to-r from-purple-600 to-pink-600 text-white font-medium py-3 px-6 rounded-lg hover:from-purple-700 hover:to-pink-700 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed">
+                    🎨 기억의 궁전 생성하기
+                </button>
+            </div>
+
+            <!-- 오른쪽: 생성된 스토리 -->
+            <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+                <div class="flex items-center justify-between mb-6">
+                    <h2 class="text-xl font-semibold text-gray-900 dark:text-white">생성된 기억의 궁전</h2>
+                    <div class="flex space-x-2">
+                        <button id="regenerateBtn" class="p-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors disabled:opacity-50" disabled>
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                            </svg>
+                        </button>
+                        <button id="saveBtn" class="p-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors disabled:opacity-50" disabled>
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"></path>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+
+                <div id="storyContainer" class="prose prose-gray dark:prose-invert max-w-none">
+                    <div class="text-center py-12 text-gray-500 dark:text-gray-400">
+                        <svg class="w-16 h-16 mx-auto mb-4 text-gray-300 dark:text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path>
+                        </svg>
+                        <p>기억할 항목을 입력하고 생성 버튼을 눌러주세요.</p>
+                        <p class="text-sm mt-2">AI가 당신만의 특별한 기억의 궁전을 만들어드립니다.</p>
+                    </div>
+                </div>
+
+                <!-- 로딩 스피너 -->
+                <div id="loadingSpinner" class="hidden">
+                    <div class="flex items-center justify-center py-12">
+                        <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600"></div>
+                    </div>
+                    <p class="text-center text-gray-600 dark:text-gray-400 mt-4">기억의 궁전을 건설하는 중...</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- 저장된 스토리 목록 -->
+        <div class="mt-8 bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+            <h2 class="text-xl font-semibold text-gray-900 dark:text-white mb-4">저장된 기억의 궁전들</h2>
+            <div id="savedStories" class="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <!-- 동적으로 저장된 스토리 표시 -->
+            </div>
+        </div>
+    </main>
+
+    <script src="js/app.js"></script>
+</body>
+</html> 

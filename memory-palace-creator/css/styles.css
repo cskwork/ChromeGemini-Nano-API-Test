@@ -1,0 +1,174 @@
+/* Memory Palace Creator - 커스텀 스타일 */
+
+/* 애니메이션 정의 */
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes slideUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* 애니메이션 클래스 */
+.animate-fade-in {
+    animation: fadeIn 0.5s ease-in-out;
+}
+
+.animate-slide-up {
+    animation: slideUp 0.3s ease-out;
+}
+
+/* line-clamp 유틸리티 */
+.line-clamp-2 {
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+}
+
+/* 프로즈 스타일 커스터마이징 */
+.prose h2 {
+    margin-top: 2em;
+    margin-bottom: 1em;
+}
+
+.prose h3 {
+    margin-top: 1.5em;
+    margin-bottom: 0.75em;
+}
+
+.prose strong {
+    font-weight: 700;
+}
+
+/* 다크모드 전환 애니메이션 */
+* {
+    transition-property: background-color, border-color, color, fill, stroke;
+    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+    transition-duration: 150ms;
+}
+
+/* 로딩 스피너 애니메이션 개선 */
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+.animate-spin {
+    animation: spin 1s linear infinite;
+}
+
+/* 메모리 아이템 호버 효과 */
+.memory-item:hover {
+    background-color: rgba(147, 51, 234, 0.05);
+    border-radius: 0.5rem;
+    padding: 0.25rem;
+    margin: -0.25rem;
+}
+
+.dark .memory-item:hover {
+    background-color: rgba(147, 51, 234, 0.1);
+}
+
+/* 저장된 스토리 카드 효과 */
+.saved-story {
+    transition: all 0.2s ease;
+}
+
+.saved-story:hover {
+    transform: translateY(-2px);
+}
+
+/* 버튼 포커스 스타일 */
+button:focus-visible {
+    outline: 2px solid transparent;
+    outline-offset: 2px;
+    box-shadow: 0 0 0 2px rgb(147 51 234 / 0.5);
+}
+
+/* 입력 필드 포커스 스타일 */
+input:focus-visible,
+select:focus-visible {
+    outline: 2px solid transparent;
+    outline-offset: 2px;
+    box-shadow: 0 0 0 2px rgb(147 51 234 / 0.5);
+}
+
+/* 스크롤바 스타일링 */
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: #f1f1f1;
+}
+
+.dark ::-webkit-scrollbar-track {
+    background: #374151;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #888;
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #555;
+}
+
+.dark ::-webkit-scrollbar-thumb {
+    background: #6b7280;
+}
+
+.dark ::-webkit-scrollbar-thumb:hover {
+    background: #9ca3af;
+}
+
+/* 알림 애니메이션 */
+@keyframes slideInRight {
+    from {
+        transform: translateX(100%);
+        opacity: 0;
+    }
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+
+.notification {
+    animation: slideInRight 0.3s ease-out;
+}
+
+/* 반응형 개선 */
+@media (max-width: 640px) {
+    .container {
+        padding-left: 1rem;
+        padding-right: 1rem;
+    }
+    
+    .memory-item {
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+    
+    .memory-item .item-category {
+        width: 100%;
+    }
+} 
